@@ -1,65 +1,107 @@
-import Image from "next/image";
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
+import { SaralArch, SaralWordmark } from "@/components/brand/SaralArch";
+import { Card } from "@/components/ui/Card";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="min-h-dvh flex flex-col px-5 pt-16 pb-10 max-w-md mx-auto w-full">
+      {/* Brand mark */}
+      <div className="flex flex-col items-center pt-10">
+        <SaralArch size={96} />
+        <div className="mt-8 flex flex-col items-center">
+          <SaralWordmark size={48} />
+          <span
+            className="font-hindi text-text-tertiary mt-1"
+            style={{ fontSize: "1.125rem", lineHeight: 1 }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            सरल
+          </span>
+        </div>
+        <p className="mt-4 text-body-md text-text-secondary text-center">
+          Care, made simple.
+        </p>
+      </div>
+
+      {/* Role select */}
+      <div className="mt-14 flex flex-col gap-3">
+        <p className="text-h4 font-semibold text-text-primary px-1">
+          I am a…
+        </p>
+
+        <Link
+          href="/staff/queue"
+          className="group"
+          aria-label="Open clinic staff view"
+        >
+          <Card
+            bordered
+            className="flex items-center gap-4 p-4 transition-colors group-hover:bg-surface-raised"
+          >
+            <div className="size-12 rounded-full bg-surface-sunken flex items-center justify-center">
+              <span className="text-label-lg font-semibold text-text-primary">
+                R
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-label-lg font-semibold text-text-primary">
+                Receptionist
+              </p>
+              <p className="text-body-sm text-text-secondary truncate">
+                Manage front desk, queue, walk-ins, records
+              </p>
+            </div>
+            <ChevronRight
+              size={20}
+              className="text-text-tertiary flex-none"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </Card>
+        </Link>
+
+        <Link
+          href="/staff/queue"
+          className="group"
+          aria-label="Open clinic doctor view"
+        >
+          <Card
+            bordered
+            className="flex items-center gap-4 p-4 transition-colors group-hover:bg-surface-raised"
           >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <div className="size-12 rounded-full bg-surface-sunken flex items-center justify-center">
+              <span className="text-label-lg font-semibold text-text-primary">
+                D
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-label-lg font-semibold text-text-primary">
+                Doctor
+              </p>
+              <p className="text-body-sm text-text-secondary truncate">
+                Same access — can step in if reception is away
+              </p>
+            </div>
+            <ChevronRight
+              size={20}
+              className="text-text-tertiary flex-none"
+            />
+          </Card>
+        </Link>
+      </div>
+
+      {/* Patient hint */}
+      <Card surface="raised" className="mt-8 p-4 flex flex-col gap-1">
+        <p className="text-label-md font-semibold text-text-primary">
+          Patient?
+        </p>
+        <p className="text-body-sm text-text-secondary leading-snug">
+          No app needed. Scan the QR at the clinic, or open the link we
+          sent on WhatsApp.
+        </p>
+      </Card>
+
+      <p className="mt-auto text-caption text-text-tertiary text-center pt-8">
+        Powered by Saral · Care, made simple.
+      </p>
+    </main>
   );
 }
