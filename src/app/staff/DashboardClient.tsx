@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   Plus,
-  Calendar,
   ChevronRight,
-  Camera,
   AlertCircle,
+  HeartPulse,
+  Phone,
+  Stethoscope,
+  X,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { StaffBottomNav } from "@/components/staff/StaffBottomNav";
@@ -36,6 +38,7 @@ export function DashboardClient({
     desc?: string;
   } | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const [emergencyOpen, setEmergencyOpen] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -256,43 +259,166 @@ export function DashboardClient({
 
         {/* ─── QUICK ACTIONS ─── */}
         <div>
-          <div className="flex items-center justify-between px-1 mb-2">
-            <span className="text-label-lg font-semibold text-text-primary">
-              Quick actions
-            </span>
-            <Link
-              href="/staff/queue"
-              className="text-label-md font-semibold text-text-brand"
-            >
-              See all
-            </Link>
-          </div>
+          <p className="text-label-lg font-semibold text-text-primary px-1 mb-2">
+            Quick actions
+          </p>
           <div className="grid grid-cols-3 gap-3">
             <QuickAction
               label="New booking"
-              icon={<Plus size={20} />}
+              icon={<Plus size={22} strokeWidth={2.2} />}
               href="/staff/booking/new"
             />
             <QuickAction
               label="Walk-in"
-              icon={<Plus size={20} />}
+              icon={<Plus size={22} strokeWidth={2.2} />}
               href="/staff/walkin"
             />
             <QuickAction
-              label="Save Rx"
-              icon={<Camera size={20} />}
-              href={
-                nowServing
-                  ? `/staff/visit/${nowServing.id}/save`
-                  : "/staff/queue"
-              }
+              label="Emergency"
+              icon={<HeartPulse size={22} strokeWidth={2.2} />}
+              onClick={() => setEmergencyOpen(true)}
             />
           </div>
         </div>
       </div>
 
       <StaffBottomNav active="home" />
+
+      {emergencyOpen && (
+        <EmergencySheet onClose={() => setEmergencyOpen(false)} />
+      )}
     </main>
+  );
+}
+
+/* ============================================================
+   Emergency sheet — surfaces fast-call + priority queue actions
+   ============================================================ */
+
+function EmergencySheet({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <button
+        aria-label="Close emergency menu"
+        onClick={onClose}
+        className="absolute inset-0 bg-surface-inverse/55 animate-in fade-in duration-200"
+      />
+      <div
+        className={cn(
+          "relative w-full max-w-md bg-surface-canvas rounded-t-3xl",
+          "px-5 pt-3 pb-8 shadow-lg",
+          "animate-in slide-in-from-bottom duration-300 ease-out",
+        )}
+        role="dialog"
+        aria-labelledby="emergency-title"
+      >
+        <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-border-default" />
+
+        <div className="flex items-start gap-3 mb-1">
+          <span className="size-11 rounded-full bg-sindoor-50 text-text-critical flex items-center justify-center flex-none">
+            <HeartPulse size={22} strokeWidth={2.2} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <h2
+              id="emergency-title"
+              className="text-h3 font-bold text-text-primary leading-tight"
+            >
+              Emergency
+            </h2>
+            <p className="text-body-sm text-text-secondary mt-1 leading-snug">
+              Reach help fast. We won&apos;t dial anything until you confirm.
+            </p>
+          </div>
+          <button
+            aria-label="Close"
+            onClick={onClose}
+            className="size-9 -mt-1 -mr-1 flex items-center justify-center rounded-full hover:bg-surface-sunken"
+          >
+            <X size={18} className="text-text-secondary" />
+          </button>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-2">
+          <a
+            href="tel:108"
+            className={cn(
+              "h-13 inline-flex items-center gap-3 rounded-xl px-4 py-3.5",
+              "bg-sindoor-500 text-white",
+              "text-label-lg font-semibold",
+              "transition-transform active:scale-[0.98]",
+            )}
+          >
+            <Phone size={18} />
+            <span className="flex-1 text-left leading-tight">
+              Call ambulance
+              <span className="block text-caption font-normal text-white/80 mt-0.5">
+                108 · National helpline
+              </span>
+            </span>
+            <ChevronRight size={18} className="text-white/70" />
+          </a>
+
+          <Link
+            href="/staff/walkin?priority=1"
+            onClick={onClose}
+            className={cn(
+              "h-13 inline-flex items-center gap-3 rounded-xl px-4 py-3.5",
+              "bg-surface-canvas border border-border-default",
+              "text-text-primary",
+              "transition-colors hover:bg-surface-raised",
+            )}
+          >
+            <span className="size-9 rounded-lg bg-surface-brand-subtle text-text-brand flex items-center justify-center flex-none">
+              <Plus size={18} strokeWidth={2.4} />
+            </span>
+            <span className="flex-1 text-left leading-tight">
+              <span className="text-label-md font-semibold">
+                Add emergency walk-in
+              </span>
+              <span className="block text-caption text-text-secondary mt-0.5">
+                Jumps to the top of the queue
+              </span>
+            </span>
+            <ChevronRight size={18} className="text-text-tertiary" />
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              alert("Doctor notified · v1.1 will buzz the in-room console");
+            }}
+            className={cn(
+              "h-13 inline-flex items-center gap-3 rounded-xl px-4 py-3.5",
+              "bg-surface-canvas border border-border-default",
+              "text-text-primary text-left",
+              "transition-colors hover:bg-surface-raised",
+            )}
+          >
+            <span className="size-9 rounded-lg bg-sage-100 text-text-success flex items-center justify-center flex-none">
+              <Stethoscope size={18} strokeWidth={2.2} />
+            </span>
+            <span className="flex-1 leading-tight">
+              <span className="text-label-md font-semibold">
+                Notify doctor
+              </span>
+              <span className="block text-caption text-text-secondary mt-0.5">
+                Sends a high-priority ping to the in-room app
+              </span>
+            </span>
+            <ChevronRight size={18} className="text-text-tertiary" />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-4 w-full h-11 text-label-md font-semibold text-text-secondary"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -382,24 +508,38 @@ function QuickAction({
   label,
   icon,
   href,
+  onClick,
 }: {
   label: string;
   icon: React.ReactNode;
-  href: string;
+  href?: string;
+  onClick?: () => void;
 }) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "h-24 flex flex-col items-center justify-center gap-1.5 rounded-xl",
-        "bg-surface-raised border border-border-subtle",
-        "text-text-primary transition-transform active:scale-95 hover:bg-surface-sunken",
-      )}
-    >
-      <span className="size-9 rounded-lg bg-surface-canvas flex items-center justify-center text-text-brand">
+  const inner = (
+    <>
+      <span className="size-12 rounded-full bg-surface-canvas flex items-center justify-center text-text-brand shadow-sm">
         {icon}
       </span>
-      <span className="text-label-sm font-medium text-center">{label}</span>
-    </Link>
+      <span className="text-label-md font-semibold text-text-primary">
+        {label}
+      </span>
+    </>
+  );
+  const className = cn(
+    "h-28 flex flex-col items-center justify-center gap-2.5 rounded-2xl",
+    "bg-surface-raised border border-border-subtle",
+    "transition-transform active:scale-95 hover:bg-surface-sunken",
+  );
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} className={className}>
+      {inner}
+    </button>
   );
 }
