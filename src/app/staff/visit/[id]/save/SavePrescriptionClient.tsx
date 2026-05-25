@@ -16,6 +16,32 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Toast } from "@/components/ui/Toast";
 import { TokenChip } from "@/components/ui/TokenChip";
+
+/**
+ * Four Haldi corner brackets to wrap the viewfinder/camera frame.
+ * Each bracket = 2 short strokes meeting at right angles.
+ */
+function CornerBrackets() {
+  const stroke = "bg-accent-500";
+  const armLen = "w-7 h-[3px]";   // horizontal arm: 28px × 3px
+  const armLenV = "w-[3px] h-7";  // vertical arm:   3px × 28px
+  return (
+    <>
+      {/* Top-left */}
+      <span className={cn("absolute top-8 left-8 rounded-sm", stroke, armLen)} aria-hidden />
+      <span className={cn("absolute top-8 left-8 rounded-sm", stroke, armLenV)} aria-hidden />
+      {/* Top-right */}
+      <span className={cn("absolute top-8 right-8 rounded-sm", stroke, armLen)} aria-hidden />
+      <span className={cn("absolute top-8 right-8 rounded-sm", stroke, armLenV)} aria-hidden />
+      {/* Bottom-left (above shutter area) */}
+      <span className={cn("absolute bottom-28 left-8 rounded-sm", stroke, armLen)} aria-hidden />
+      <span className={cn("absolute bottom-28 left-8 rounded-sm", stroke, armLenV)} aria-hidden />
+      {/* Bottom-right */}
+      <span className={cn("absolute bottom-28 right-8 rounded-sm", stroke, armLen)} aria-hidden />
+      <span className={cn("absolute bottom-28 right-8 rounded-sm", stroke, armLenV)} aria-hidden />
+    </>
+  );
+}
 import {
   callNext,
   markVisitDone,
@@ -191,22 +217,49 @@ export function SavePrescriptionClient({
           <button
             onClick={() => fileRef.current?.click()}
             className={cn(
-              "w-full h-56 rounded-2xl border-2 border-dashed border-border-default",
-              "bg-surface-raised flex flex-col items-center justify-center gap-3",
-              "transition-colors active:bg-surface-sunken",
+              "relative w-full h-64 rounded-2xl bg-surface-inverse overflow-hidden",
+              "flex flex-col items-center justify-center gap-3 px-6",
+              "transition-transform active:scale-[0.99]",
             )}
+            aria-label="Open camera to snap prescription"
           >
-            <span className="size-14 rounded-full bg-surface-canvas flex items-center justify-center">
-              <Camera size={26} className="text-accent-500" />
+            {/* Haldi corner brackets — the camera viewfinder feel */}
+            <CornerBrackets />
+
+            {/* Eyebrow label */}
+            <span className="absolute top-5 inset-x-0 text-center text-label-sm font-medium tracking-widest text-text-inverse/55 uppercase">
+              Place prescription in frame
             </span>
-            <p className="text-label-lg font-semibold text-text-primary">
-              Snap the paper prescription
-            </p>
-            <p className="text-body-sm text-text-secondary text-center px-6">
-              We&apos;ll send it to {visit.patient_name.split(" ")[0]} on
-              WhatsApp the moment you save.
-            </p>
+
+            {/* Document silhouette (sits behind shutter) */}
+            <div className="opacity-15 mb-12">
+              <svg width="80" height="100" viewBox="0 0 80 100" fill="none">
+                <rect x="6" y="6" width="68" height="88" rx="3" stroke="#FAF8F4" strokeWidth="1.5" strokeDasharray="4 4" />
+                {[20, 32, 44, 56, 68].map((y, i) => (
+                  <rect
+                    key={i}
+                    x="14"
+                    y={y}
+                    width={i % 2 === 0 ? 52 : 42}
+                    height={2}
+                    fill="#FAF8F4"
+                  />
+                ))}
+              </svg>
+            </div>
+
+            {/* Shutter */}
+            <span className="absolute bottom-6 size-16 rounded-full border-4 border-text-inverse flex items-center justify-center">
+              <span className="size-12 rounded-full bg-text-inverse" />
+            </span>
           </button>
+        )}
+
+        {!photoPreview && (
+          <p className="-mt-2 text-caption text-text-tertiary text-center px-6">
+            We&apos;ll send the photo to {visit.patient_name.split(" ")[0]} on
+            WhatsApp the moment you save.
+          </p>
         )}
 
         {/* Medicines */}

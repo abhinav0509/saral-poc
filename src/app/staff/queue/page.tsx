@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState, useTransition, useCallback } from "react";
+import { useEffect, useState, useTransition, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ChevronLeft,
   MapPin,
   Plus,
   Phone,
   X,
   Camera,
   ChevronRight,
+  GripVertical,
   Share2,
+  CheckCircle2,
 } from "lucide-react";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { Card } from "@/components/ui/Card";
@@ -19,6 +20,9 @@ import { TokenChip } from "@/components/ui/TokenChip";
 import { SourceBadge } from "@/components/ui/SourceBadge";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { SearchBar } from "@/components/ui/SearchBar";
+import { StaffBottomNav } from "@/components/staff/StaffBottomNav";
 import {
   getClinicByCode,
   getActiveQueue,
@@ -30,6 +34,7 @@ import type { Clinic, Visit } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
 const CLINIC_CODE = "drmehta";
+type TabKey = "waiting" | "done" | "all";
 
 export default function StaffQueuePage() {
   const router = useRouter();
@@ -44,6 +49,15 @@ export default function StaffQueuePage() {
   } | null>(null);
   const [dropConfirm, setDropConfirm] = useState<Visit | null>(null);
   const [pending, startPending] = useTransition();
+  const [tab, setTab] = useState<TabKey>("waiting");
+  const [search, setSearch] = useState("");
+  const [now, setNow] = useState(() => new Date());
+
+  // Tick clock once a minute for the top-bar timestamp
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -66,12 +80,11 @@ export default function StaffQueuePage() {
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     void load();
   }, [load]);
 
-  // Realtime subscription — refetch on any visits-table change
+  // Realtime subscription
   useEffect(() => {
     if (!clinic) return;
     const channel = getSupabase()
@@ -84,9 +97,7 @@ export default function StaffQueuePage() {
           table: "visits",
           filter: `clinic_id=eq.${clinic.id}`,
         },
-        () => {
-          void load();
-        },
+        () => void load(),
       )
       .subscribe();
     return () => {
@@ -95,7 +106,20 @@ export default function StaffQueuePage() {
   }, [clinic, load]);
 
   const nowServing = queue.find((v) => v.status === "now_serving") ?? null;
-  const waiting = queue.filter((v) => v.status === "waiting");
+  const waiting = useMemo(
+    () => queue.filter((v) => v.status === "waiting"),
+    [queue],
+  );
+
+  const filteredWaiting = useMemo(() => {
+    if (!search.trim()) return waiting;
+    const q = search.trim().toLowerCase();
+    return waiting.filter(
+      (v) =>
+        v.patient_name.toLowerCase().includes(q) ||
+        v.token.toLowerCase().includes(q),
+    );
+  }, [waiting, search]);
 
   function handleCall(v: Visit) {
     if (!clinic) return;
@@ -136,34 +160,61 @@ export default function StaffQueuePage() {
     router.push(`/staff/visit/${nowServing.id}/save`);
   }
 
+  function timerStr(startedAt: string | null): string | null {
+    if (!startedAt) return null;
+    const started = new Date(startedAt).getTime();
+    const diffMs = now.getTime() - started;
+    if (diffMs < 0) return null;
+    const totalSecs = Math.floor(diffMs / 1000);
+    const hours = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = totalSecs % 60;
+    if (hours >= 1) {
+      // Anything beyond an hour is suspect (probably seed data) — show compact form
+      return `${hours}h ${String(mins).padStart(2, "0")}m`;
+    }
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  }
+
+  function etaFor(idx: number): string {
+    const mins = (idx + 1) * 6; // 6 min per consult average
+    if (mins < 60) return `ETA ~${mins} min`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `ETA ~${h}h ${m}m`;
+  }
+
+  const dateLabel = now.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const timeLabel = now.toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: false,
+  });
+
   return (
     <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas">
       {/* Top app bar */}
-      <header className="flex items-center px-3 h-14 border-b border-border-subtle bg-surface-canvas sticky top-0 z-10">
-        <Link
-          href="/"
-          className="size-10 flex items-center justify-center rounded-full hover:bg-surface-sunken"
-          aria-label="Back"
-        >
-          <ChevronLeft size={22} className="text-text-primary" />
-        </Link>
+      <header className="flex items-center px-3 h-16 border-b border-border-subtle bg-surface-canvas sticky top-0 z-10">
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <SaralArch size={22} />
-          <div className="flex flex-col min-w-0">
-            <span className="text-label-md font-semibold text-text-primary leading-tight truncate">
+          <SaralArch size={24} />
+          <div className="flex flex-col min-w-0 leading-tight">
+            <span className="text-label-md font-semibold text-text-primary truncate">
               {clinic?.name ?? "Loading…"}
             </span>
-            {clinic?.address && (
-              <span className="text-caption text-text-secondary leading-tight inline-flex items-center gap-1 truncate">
-                <MapPin size={10} className="flex-none" />
-                {clinic.address}
-              </span>
-            )}
+            <span className="text-caption text-text-secondary inline-flex items-center gap-1 truncate">
+              <span className="size-1.5 rounded-full bg-accent-500" />
+              Live · {dateLabel} · {timeLabel}
+            </span>
           </div>
         </div>
+
         <button
-          aria-label="Add walk-in"
-          className="h-10 px-3.5 inline-flex items-center gap-1.5 bg-surface-brand text-text-inverse rounded-full text-label-md font-semibold"
+          aria-label="Copy walk-in link"
+          className="h-9 px-3 mr-2 inline-flex items-center gap-1.5 bg-surface-brand text-text-inverse rounded-full text-label-sm font-semibold transition-transform active:scale-95"
           onClick={() => {
             if (clinic) {
               void navigator.clipboard.writeText(
@@ -172,7 +223,7 @@ export default function StaffQueuePage() {
               setToast({
                 tone: "info",
                 title: "Walk-in link copied",
-                desc: "Share with patient or scan the printed QR",
+                desc: "Share with patient or paste in the printed QR",
               });
             }
           }}
@@ -180,6 +231,14 @@ export default function StaffQueuePage() {
           <Plus size={16} strokeWidth={2.5} />
           Walk-in
         </button>
+
+        <Link
+          href="/"
+          aria-label="Account"
+          className="size-9 rounded-full bg-surface-sunken border border-border-subtle flex items-center justify-center text-label-md font-semibold text-text-primary"
+        >
+          P
+        </Link>
       </header>
 
       {/* Top-of-screen toast */}
@@ -195,7 +254,7 @@ export default function StaffQueuePage() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col p-4 gap-3">
+      <div className="flex-1 flex flex-col px-4 pt-4 gap-3">
         {/* Error */}
         {error && (
           <Card surface="raised" bordered className="p-4 border-border-critical">
@@ -210,30 +269,45 @@ export default function StaffQueuePage() {
         {nowServing ? (
           <Card surface="inverse" elevation="md" className="p-5">
             <div className="flex items-center justify-between">
-              <span className="text-label-sm font-medium text-text-inverse/70 uppercase tracking-wider">
-                Live · Now serving
+              <span className="inline-flex items-center gap-2">
+                <span className="size-2 rounded-full bg-accent-500 animate-pulse" />
+                <span className="text-label-sm font-medium text-text-inverse/70 uppercase tracking-wider">
+                  Live · Now serving
+                </span>
               </span>
-              <span className="size-2 rounded-full bg-accent-500 animate-pulse" />
+              {timerStr(nowServing.started_at) && (
+                <span className="text-caption text-text-inverse/60 tnum">
+                  {timerStr(nowServing.started_at)}
+                </span>
+              )}
             </div>
-            <div className="mt-3 flex items-baseline gap-4">
+
+            <div className="my-3 h-px bg-white/10" />
+
+            <div className="flex items-center gap-4">
               <span
                 className="font-bold text-text-inverse tnum leading-none"
                 style={{ fontSize: "3rem" }}
               >
                 {nowServing.token}
               </span>
-              <div className="flex flex-col min-w-0">
-                <span className="text-label-lg font-medium text-text-inverse truncate">
-                  {nowServing.patient_name}
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <span className="size-9 rounded-full bg-white/10 flex items-center justify-center text-label-md font-semibold text-text-inverse flex-none">
+                  {nowServing.patient_name[0]}
                 </span>
-                <span className="text-caption text-text-inverse/60 truncate">
-                  {nowServing.gender} · {nowServing.age} ·{" "}
-                  {nowServing.reason ?? "—"}
-                </span>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-label-md font-medium text-text-inverse truncate">
+                    {nowServing.patient_name}
+                  </span>
+                  <span className="text-caption text-text-inverse/60 truncate">
+                    {nowServing.gender} · {nowServing.age} ·{" "}
+                    {nowServing.reason ?? "—"}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Hero CTA */}
+            {/* Hero CTA — the brand's hero moment */}
             <button
               onClick={handleSaveRx}
               disabled={pending}
@@ -264,10 +338,28 @@ export default function StaffQueuePage() {
           )
         )}
 
-        {/* Waiting list header */}
-        <div className="flex items-center justify-between px-1 pt-2">
+        {/* Tabs */}
+        <SegmentedTabs
+          tabs={[
+            { key: "waiting", label: "Waiting", count: waiting.length },
+            { key: "done", label: "Done" },
+            { key: "all", label: "All" },
+          ]}
+          active={tab}
+          onChange={(k) => setTab(k as TabKey)}
+        />
+
+        {/* Search */}
+        <SearchBar value={search} onChange={setSearch} />
+
+        {/* List header */}
+        <div className="flex items-center justify-between px-1 pt-1">
           <span className="text-label-lg font-semibold text-text-primary">
-            {waiting.length} waiting
+            {tab === "waiting"
+              ? `${filteredWaiting.length} ${filteredWaiting.length === 1 ? "patient" : "waiting"}`
+              : tab === "done"
+                ? "Today's done"
+                : "All"}
           </span>
           <span className="inline-flex items-center gap-1.5 text-caption text-text-tertiary">
             <span className="size-1.5 rounded-full bg-sage-500" />
@@ -276,18 +368,40 @@ export default function StaffQueuePage() {
         </div>
 
         {/* Waiting list */}
-        {loading && waiting.length === 0 ? (
+        {tab !== "waiting" ? (
+          <Card surface="raised" className="p-8 flex flex-col items-center gap-2 text-center">
+            <CheckCircle2 size={28} className="text-text-tertiary" />
+            <p className="text-label-lg font-semibold text-text-primary">
+              {tab === "done" ? "Done tab coming soon" : "All view coming soon"}
+            </p>
+            <p className="text-body-sm text-text-secondary">
+              We&apos;re shipping this view next. The Waiting tab is the daily driver.
+            </p>
+          </Card>
+        ) : loading && filteredWaiting.length === 0 ? (
           <Card surface="raised" className="p-6 text-center">
             <p className="text-body-sm text-text-secondary">Loading queue…</p>
           </Card>
-        ) : waiting.length === 0 ? (
-          <EmptyWaiting clinicCode={clinic?.code ?? "drmehta"} />
+        ) : filteredWaiting.length === 0 ? (
+          search ? (
+            <Card surface="raised" className="p-6 text-center">
+              <p className="text-label-md font-semibold text-text-primary">
+                No matches for &ldquo;{search}&rdquo;
+              </p>
+              <p className="text-body-sm text-text-secondary mt-1">
+                Try a different name or token, or clear the search.
+              </p>
+            </Card>
+          ) : (
+            <EmptyWaiting clinicCode={clinic?.code ?? "drmehta"} />
+          )
         ) : (
           <div className="flex flex-col divide-y divide-border-subtle border-y border-border-subtle">
-            {waiting.map((v) => (
+            {filteredWaiting.map((v, idx) => (
               <QueueRow
                 key={v.id}
                 visit={v}
+                eta={etaFor(idx)}
                 onCall={() => handleCall(v)}
                 onDrop={() => setDropConfirm(v)}
                 disabled={pending}
@@ -295,7 +409,13 @@ export default function StaffQueuePage() {
             ))}
           </div>
         )}
+
+        {/* Spacer */}
+        <div className="pb-2" />
       </div>
+
+      {/* Bottom nav */}
+      <StaffBottomNav active="queue" />
 
       {/* Drop confirm sheet */}
       {dropConfirm && (
@@ -316,18 +436,25 @@ export default function StaffQueuePage() {
 
 function QueueRow({
   visit,
+  eta,
   onCall,
   onDrop,
   disabled,
 }: {
   visit: Visit;
+  eta: string;
   onCall: () => void;
   onDrop: () => void;
   disabled: boolean;
 }) {
   const sourceMap = { online: "online", qr: "qr", phone: "phone" } as const;
   return (
-    <div className="flex items-center gap-3 py-3">
+    <div className="flex items-center gap-2 py-3">
+      <GripVertical
+        size={16}
+        className="text-text-tertiary flex-none -ml-1 opacity-60"
+        aria-hidden
+      />
       <TokenChip>{visit.token}</TokenChip>
       <div className="flex-1 min-w-0">
         <p className="text-label-lg font-medium text-text-primary truncate">
@@ -336,7 +463,7 @@ function QueueRow({
         <div className="flex items-center gap-2 mt-1 min-w-0">
           <SourceBadge source={sourceMap[visit.source]} />
           <span className="text-caption text-text-tertiary truncate min-w-0">
-            {visit.reason ?? "—"}
+            {eta}
           </span>
         </div>
       </div>
