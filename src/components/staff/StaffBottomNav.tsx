@@ -13,14 +13,19 @@ interface NavItem {
 
 /**
  * 4-tab persistent bottom nav for staff app surfaces.
- * Sits sticky/fixed at the bottom inside the staff layout.
  *
- * Only "Queue" is wired up for v1; the rest navigate to placeholder
- * routes that fall through to the splash for now. Visual completeness
- * matters more than function for these — they show the receptionist
- * the app's full surface.
+ * Fixed-position so it ALWAYS sits at the viewport bottom regardless
+ * of page scroll or content length. Page content needs `pb-20`-ish
+ * bottom padding to scroll past it.
+ *
+ * Only "Queue" is wired up for v1; other tabs go to splash for now —
+ * visual completeness signals the full surface to the receptionist.
  */
-export function StaffBottomNav({ active }: { active?: "home" | "queue" | "calendar" | "more" }) {
+export function StaffBottomNav({
+  active,
+}: {
+  active?: "home" | "queue" | "calendar" | "more";
+}) {
   const pathname = usePathname();
   const items: (NavItem & { key: NonNullable<typeof active> })[] = [
     { key: "home",     label: "Home",     href: "/",            icon: <Home size={22} strokeWidth={2} /> },
@@ -29,12 +34,11 @@ export function StaffBottomNav({ active }: { active?: "home" | "queue" | "calend
     { key: "more",     label: "More",     href: "/staff/queue", icon: <MoreHorizontal size={22} strokeWidth={2} /> },
   ];
 
-  // Derive active tab if not explicitly set
   const activeTab = active ?? (pathname?.startsWith("/staff/queue") ? "queue" : "home");
 
   return (
     <nav
-      className="sticky bottom-0 left-0 right-0 bg-surface-canvas/95 backdrop-blur-md border-t border-border-subtle pb-[env(safe-area-inset-bottom)] z-20"
+      className="fixed bottom-0 inset-x-0 z-30 bg-surface-canvas/95 backdrop-blur-md border-t border-border-subtle pb-[env(safe-area-inset-bottom)]"
       aria-label="Primary"
     >
       <div className="max-w-md mx-auto grid grid-cols-4">

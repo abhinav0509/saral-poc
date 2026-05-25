@@ -34,6 +34,23 @@ export async function getActiveQueue(clinicId: string): Promise<Visit[]> {
   return (data as Visit[] | null) ?? [];
 }
 
+/**
+ * All visits today (any status) — for the Done / All tabs.
+ * Returns rows sorted with most recently-ended first.
+ */
+export async function getTodayVisits(clinicId: string): Promise<Visit[]> {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const { data, error } = await getSupabase()
+    .from("visits")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .gte("created_at", startOfDay.toISOString())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as Visit[] | null) ?? [];
+}
+
 export async function getNowServing(clinicId: string): Promise<Visit | null> {
   const { data, error } = await getSupabase()
     .from("visits")
