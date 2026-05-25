@@ -4,19 +4,16 @@ import { useEffect, useState, useTransition, useCallback, useMemo } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  MapPin,
   Plus,
   Phone,
   X,
   Camera,
-  ChevronRight,
-  GripVertical,
+  MoreVertical,
   Share2,
   CheckCircle2,
 } from "lucide-react";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { Card } from "@/components/ui/Card";
-import { TokenChip } from "@/components/ui/TokenChip";
 import { SourceBadge } from "@/components/ui/SourceBadge";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
@@ -53,7 +50,6 @@ export default function StaffQueuePage() {
   const [search, setSearch] = useState("");
   const [now, setNow] = useState(() => new Date());
 
-  // Tick clock once a minute for the top-bar timestamp
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(t);
@@ -84,7 +80,6 @@ export default function StaffQueuePage() {
     void load();
   }, [load]);
 
-  // Realtime subscription
   useEffect(() => {
     if (!clinic) return;
     const channel = getSupabase()
@@ -160,6 +155,16 @@ export default function StaffQueuePage() {
     router.push(`/staff/visit/${nowServing.id}/save`);
   }
 
+  function handleCallNext() {
+    if (!clinic) return;
+    const next = waiting[0];
+    if (!next) {
+      setToast({ tone: "info", title: "No one waiting", desc: "Queue is empty." });
+      return;
+    }
+    handleCall(next);
+  }
+
   function timerStr(startedAt: string | null): string | null {
     if (!startedAt) return null;
     const started = new Date(startedAt).getTime();
@@ -169,19 +174,16 @@ export default function StaffQueuePage() {
     const hours = Math.floor(totalSecs / 3600);
     const mins = Math.floor((totalSecs % 3600) / 60);
     const secs = totalSecs % 60;
-    if (hours >= 1) {
-      // Anything beyond an hour is suspect (probably seed data) — show compact form
-      return `${hours}h ${String(mins).padStart(2, "0")}m`;
-    }
-    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    if (hours >= 1) return `${hours}h ${String(mins).padStart(2, "0")}m`;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")} min`;
   }
 
   function etaFor(idx: number): string {
-    const mins = (idx + 1) * 6; // 6 min per consult average
-    if (mins < 60) return `ETA ~${mins} min`;
+    const mins = (idx + 1) * 6;
+    if (mins < 60) return `ETA in ~${mins} min`;
     const h = Math.floor(mins / 60);
     const m = mins % 60;
-    return `ETA ~${h}h ${m}m`;
+    return `ETA in ~${h}h ${m}m`;
   }
 
   const dateLabel = now.toLocaleDateString("en-IN", {
@@ -192,22 +194,21 @@ export default function StaffQueuePage() {
   const timeLabel = now.toLocaleTimeString("en-IN", {
     hour: "numeric",
     minute: "2-digit",
-    hour12: false,
+    hour12: true,
   });
 
   return (
     <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas">
       {/* Top app bar */}
-      <header className="flex items-center px-3 h-16 border-b border-border-subtle bg-surface-canvas sticky top-0 z-10">
-        <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <SaralArch size={24} />
+      <header className="flex items-center px-4 h-16 bg-surface-canvas sticky top-0 z-10 border-b border-border-subtle">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <SaralArch size={28} />
           <div className="flex flex-col min-w-0 leading-tight">
             <span className="text-label-md font-semibold text-text-primary truncate">
               {clinic?.name ?? "Loading…"}
             </span>
-            <span className="text-caption text-text-secondary inline-flex items-center gap-1 truncate">
-              <span className="size-1.5 rounded-full bg-accent-500" />
-              Live · {dateLabel} · {timeLabel}
+            <span className="text-caption text-text-secondary truncate">
+              {dateLabel} · {timeLabel}
             </span>
           </div>
         </div>
@@ -241,7 +242,7 @@ export default function StaffQueuePage() {
         </Link>
       </header>
 
-      {/* Top-of-screen toast */}
+      {/* Top toast */}
       {toast && (
         <div className="px-4 pt-3">
           <Toast
@@ -254,7 +255,7 @@ export default function StaffQueuePage() {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col px-4 pt-4 gap-3">
+      <div className="flex-1 flex flex-col px-4 pt-4 gap-4">
         {/* Error */}
         {error && (
           <Card surface="raised" bordered className="p-4 border-border-critical">
@@ -265,41 +266,46 @@ export default function StaffQueuePage() {
           </Card>
         )}
 
-        {/* Now Serving */}
+        {/* Now Serving — light surface, two equal buttons */}
         {nowServing ? (
-          <Card surface="inverse" elevation="md" className="p-5">
+          <Card
+            surface="raised"
+            bordered
+            elevation="sm"
+            className="p-5"
+          >
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-2">
-                <span className="size-2 rounded-full bg-accent-500 animate-pulse" />
-                <span className="text-label-sm font-medium text-text-inverse/70 uppercase tracking-wider">
+                <span className="size-2.5 rounded-full bg-sage-500 ring-4 ring-sage-100 animate-pulse" />
+                <span className="text-label-sm font-medium text-text-secondary uppercase tracking-wider">
                   Live · Now serving
                 </span>
               </span>
               {timerStr(nowServing.started_at) && (
-                <span className="text-caption text-text-inverse/60 tnum">
+                <span className="text-caption text-text-tertiary tnum">
                   {timerStr(nowServing.started_at)}
                 </span>
               )}
             </div>
 
-            <div className="my-3 h-px bg-white/10" />
+            <div className="my-3.5 h-px bg-border-subtle" />
 
             <div className="flex items-center gap-4">
               <span
-                className="font-bold text-text-inverse tnum leading-none"
-                style={{ fontSize: "3rem" }}
+                className="font-bold text-text-primary tnum leading-none flex-none"
+                style={{ fontSize: "2.5rem", letterSpacing: "-0.03em" }}
               >
                 {nowServing.token}
               </span>
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <span className="size-9 rounded-full bg-white/10 flex items-center justify-center text-label-md font-semibold text-text-inverse flex-none">
+              <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
+                <span className="size-10 rounded-full bg-surface-sunken flex items-center justify-center text-label-md font-semibold text-text-primary flex-none">
                   {nowServing.patient_name[0]}
                 </span>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-label-md font-medium text-text-inverse truncate">
+                <div className="flex flex-col min-w-0 text-right">
+                  <span className="text-label-md font-semibold text-text-primary truncate">
                     {nowServing.patient_name}
                   </span>
-                  <span className="text-caption text-text-inverse/60 truncate">
+                  <span className="text-caption text-text-secondary truncate">
                     {nowServing.gender} · {nowServing.age} ·{" "}
                     {nowServing.reason ?? "—"}
                   </span>
@@ -307,23 +313,37 @@ export default function StaffQueuePage() {
               </div>
             </div>
 
-            {/* Hero CTA — the brand's hero moment */}
-            <button
-              onClick={handleSaveRx}
-              disabled={pending}
-              className={cn(
-                "mt-5 w-full h-12 flex items-center gap-3 px-4 rounded-xl",
-                "bg-surface-raised text-text-primary",
-                "transition-transform active:scale-[0.98]",
-                "disabled:opacity-50",
-              )}
-            >
-              <Camera size={20} className="text-accent-600 flex-none" />
-              <span className="flex-1 text-left text-label-lg font-medium">
-                Save prescription · call next
-              </span>
-              <ChevronRight size={20} className="text-text-secondary flex-none" />
-            </button>
+            {/* Two equal-weight side-by-side actions */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                onClick={handleSaveRx}
+                disabled={pending}
+                className={cn(
+                  "h-11 inline-flex items-center justify-center gap-2 rounded-xl",
+                  "bg-surface-canvas border border-border-default",
+                  "text-label-md font-semibold text-text-primary",
+                  "transition-colors hover:bg-surface-sunken active:bg-surface-sunken",
+                  "disabled:opacity-50",
+                )}
+              >
+                <Camera size={18} className="text-accent-600" />
+                Save Rx
+              </button>
+              <button
+                onClick={handleCallNext}
+                disabled={pending || waiting.length === 0}
+                className={cn(
+                  "h-11 inline-flex items-center justify-center gap-2 rounded-xl",
+                  "bg-surface-brand text-text-inverse",
+                  "text-label-md font-semibold",
+                  "transition-transform active:scale-95",
+                  "disabled:opacity-50",
+                )}
+              >
+                <Phone size={18} />
+                Call next
+              </button>
+            </div>
           </Card>
         ) : (
           !loading && (
@@ -332,8 +352,18 @@ export default function StaffQueuePage() {
                 No one in the chair
               </p>
               <p className="text-body-sm text-text-secondary">
-                Tap Call on a waiting row to bring them in.
+                Tap Call next to bring in the first waiting patient.
               </p>
+              <Button
+                variant="primary"
+                size="md"
+                leadingIcon={<Phone size={16} />}
+                onClick={handleCallNext}
+                disabled={waiting.length === 0}
+                className="mt-2"
+              >
+                Call next
+              </Button>
             </Card>
           )
         )}
@@ -356,14 +386,14 @@ export default function StaffQueuePage() {
         <div className="flex items-center justify-between px-1 pt-1">
           <span className="text-label-lg font-semibold text-text-primary">
             {tab === "waiting"
-              ? `${filteredWaiting.length} ${filteredWaiting.length === 1 ? "patient" : "waiting"}`
+              ? `${filteredWaiting.length} waiting`
               : tab === "done"
                 ? "Today's done"
                 : "All"}
           </span>
           <span className="inline-flex items-center gap-1.5 text-caption text-text-tertiary">
             <span className="size-1.5 rounded-full bg-sage-500" />
-            Live · auto-updates
+            Auto-updates
           </span>
         </div>
 
@@ -375,7 +405,7 @@ export default function StaffQueuePage() {
               {tab === "done" ? "Done tab coming soon" : "All view coming soon"}
             </p>
             <p className="text-body-sm text-text-secondary">
-              We&apos;re shipping this view next. The Waiting tab is the daily driver.
+              The Waiting tab is the daily driver.
             </p>
           </Card>
         ) : loading && filteredWaiting.length === 0 ? (
@@ -410,14 +440,11 @@ export default function StaffQueuePage() {
           </div>
         )}
 
-        {/* Spacer */}
         <div className="pb-2" />
       </div>
 
-      {/* Bottom nav */}
       <StaffBottomNav active="queue" />
 
-      {/* Drop confirm sheet */}
       {dropConfirm && (
         <DropConfirmSheet
           visit={dropConfirm}
@@ -431,7 +458,10 @@ export default function StaffQueuePage() {
 }
 
 /* ============================================================
-   Sub-components
+   Queue row · matches Figma 115:2
+   - Stacked T/NN token chip on the left
+   - Name + Source · ETA (with pipe-separator feel)
+   - Right actions: round Phone + square X + ⋮ menu
    ============================================================ */
 
 function QueueRow({
@@ -448,42 +478,65 @@ function QueueRow({
   disabled: boolean;
 }) {
   const sourceMap = { online: "online", qr: "qr", phone: "phone" } as const;
+  // Token splits into "T" and number portion for the stacked chip
+  const numberPart = visit.token.replace(/^T-?/, "");
   return (
-    <div className="flex items-center gap-2 py-3">
-      <GripVertical
-        size={16}
-        className="text-text-tertiary flex-none -ml-1 opacity-60"
-        aria-hidden
-      />
-      <TokenChip>{visit.token}</TokenChip>
+    <div className="flex items-center gap-3 py-3">
+      {/* Stacked T/NN token chip */}
+      <div className="size-11 rounded-lg bg-surface-sunken flex flex-col items-center justify-center flex-none tnum leading-none">
+        <span className="text-[10px] font-medium text-text-tertiary mt-0.5">T</span>
+        <span className="text-label-md font-semibold text-text-primary mt-0.5">
+          {numberPart}
+        </span>
+      </div>
+
+      {/* Name + source + eta */}
       <div className="flex-1 min-w-0">
-        <p className="text-label-lg font-medium text-text-primary truncate">
+        <p className="text-label-lg font-semibold text-text-primary truncate">
           {visit.patient_name}
         </p>
-        <div className="flex items-center gap-2 mt-1 min-w-0">
+        <div className="flex items-center gap-2 mt-1 min-w-0 text-caption text-text-tertiary">
           <SourceBadge source={sourceMap[visit.source]} />
-          <span className="text-caption text-text-tertiary truncate min-w-0">
-            {eta}
-          </span>
+          <span aria-hidden className="size-0.5 rounded-full bg-border-default flex-none" />
+          <span className="truncate min-w-0">{eta}</span>
         </div>
       </div>
-      <div className="flex items-center gap-1.5 flex-none">
-        <button
-          aria-label={`Drop ${visit.token}`}
-          onClick={onDrop}
-          disabled={disabled}
-          className="size-9 inline-flex items-center justify-center rounded-lg bg-surface-canvas border border-border-default hover:bg-surface-sunken transition-colors disabled:opacity-40"
-        >
-          <X size={18} className="text-text-secondary" />
-        </button>
+
+      {/* Right actions */}
+      <div className="flex items-center gap-1 flex-none">
         <button
           aria-label={`Call ${visit.token}`}
           onClick={onCall}
           disabled={disabled}
-          className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg bg-surface-brand text-text-inverse text-label-md font-semibold transition-transform active:scale-95 disabled:opacity-50"
+          className={cn(
+            "size-9 inline-flex items-center justify-center rounded-full",
+            "bg-surface-brand-subtle text-text-brand",
+            "transition-transform active:scale-90 hover:bg-primary-100",
+            "disabled:opacity-40",
+          )}
         >
-          <Phone size={16} />
-          Call
+          <Phone size={16} strokeWidth={2.2} />
+        </button>
+        <button
+          aria-label={`Drop ${visit.token}`}
+          onClick={onDrop}
+          disabled={disabled}
+          className={cn(
+            "size-9 inline-flex items-center justify-center rounded-lg",
+            "bg-surface-canvas border border-border-default",
+            "transition-colors hover:bg-surface-sunken disabled:opacity-40",
+          )}
+        >
+          <X size={16} className="text-text-secondary" />
+        </button>
+        <button
+          aria-label={`More actions for ${visit.token}`}
+          className={cn(
+            "size-9 inline-flex items-center justify-center rounded-lg",
+            "hover:bg-surface-sunken transition-colors text-text-tertiary",
+          )}
+        >
+          <MoreVertical size={16} />
         </button>
       </div>
     </div>
@@ -537,7 +590,9 @@ function DropConfirmSheet({
       <div className="relative w-full max-w-md bg-surface-canvas rounded-t-3xl px-5 pt-3 pb-8 shadow-lg">
         <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-border-default" />
         <div className="flex items-center gap-2 mb-1">
-          <TokenChip size="sm">{visit.token}</TokenChip>
+          <span className="inline-flex items-center justify-center h-7 px-2 rounded-md bg-surface-sunken text-text-primary text-label-sm font-semibold tnum">
+            {visit.token}
+          </span>
           <span className="text-label-md font-semibold text-text-primary">
             {visit.patient_name}
           </span>
