@@ -100,6 +100,19 @@ export default function StaffQueuePage() {
     void load();
   }, [load]);
 
+  // Greet a successful walk-in add — receptionist gets clear confirmation
+  useEffect(() => {
+    const added = new URLSearchParams(window.location.search).get("added");
+    if (added) {
+      setToast({
+        tone: "success",
+        title: `${added} added to the queue`,
+        desc: "They'll show under Waiting below.",
+      });
+      router.replace("/staff/queue");
+    }
+  }, [router]);
+
   // Realtime: refetch on any change. Separately, detect new walk-in
   // INSERTs to fire a contextual "X just joined via QR" toast.
   useEffect(() => {
@@ -292,25 +305,14 @@ export default function StaffQueuePage() {
           </div>
         </div>
 
-        <button
-          aria-label="Copy walk-in link"
+        <Link
+          href="/staff/walkin"
+          aria-label="Add walk-in patient"
           className="h-9 px-3 mr-2 inline-flex items-center gap-1.5 bg-surface-brand text-text-inverse rounded-full text-label-sm font-semibold transition-transform active:scale-95"
-          onClick={() => {
-            if (clinic) {
-              void navigator.clipboard.writeText(
-                `${window.location.origin}/walkin/${clinic.code}`,
-              );
-              setToast({
-                tone: "info",
-                title: "Walk-in link copied",
-                desc: "Share with patient or paste in the printed QR",
-              });
-            }
-          }}
         >
           <Plus size={16} strokeWidth={2.5} />
           Walk-in
-        </button>
+        </Link>
 
         <Link
           href="/"
