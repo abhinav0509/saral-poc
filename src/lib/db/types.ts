@@ -64,6 +64,7 @@ export interface Database {
         Row: Clinic;
         Insert: Omit<Clinic, "id" | "created_at"> & { id?: string; created_at?: string };
         Update: Partial<Clinic>;
+        Relationships: [];
       };
       visits: {
         Row: Visit;
@@ -73,17 +74,27 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Visit>;
+        Relationships: [];
       };
       prescriptions: {
         Row: Prescription;
         Insert: Omit<Prescription, "id" | "created_at"> & { id?: string; created_at?: string };
         Update: Partial<Prescription>;
+        Relationships: [];
       };
       events: {
         Row: ClinicEvent;
         Insert: Omit<ClinicEvent, "id" | "created_at"> & { id?: string; created_at?: string };
         Update: Partial<ClinicEvent>;
+        Relationships: [];
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: {
+      visit_source: VisitSource;
+      visit_status: VisitStatus;
+    };
+    CompositeTypes: Record<string, never>;
   };
 }

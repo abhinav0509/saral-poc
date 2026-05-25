@@ -24,14 +24,14 @@ interface SourceBadgeProps {
 
 /**
  * Small pill indicating where a queue entry came from.
- * Three brand-tinted variants align with our 80/15/5 color rule.
+ * `whitespace-nowrap` is critical — these pills must never wrap.
  */
 export function SourceBadge({ source, className }: SourceBadgeProps) {
   const { label, classes } = STYLE_MAP[source];
   return (
     <span
       className={cn(
-        "inline-flex items-center h-[18px] px-2 rounded-full text-label-sm font-medium",
+        "inline-flex flex-none items-center h-[18px] px-2 rounded-full text-label-sm font-medium whitespace-nowrap",
         classes,
         className,
       )}

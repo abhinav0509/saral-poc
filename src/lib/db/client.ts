@@ -1,16 +1,17 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "./types";
 
 /**
  * Lazy singleton — created on first call, not at module load.
- * This keeps the build green even when env vars haven't been
- * configured yet (e.g. first Vercel deploy before Settings have
- * been filled). Errors surface only when code actually tries to
- * talk to Supabase, with a clear message.
+ * Keeps the Vercel build green when env vars haven't been filled.
+ *
+ * Note: we intentionally use the untyped SupabaseClient (no Database
+ * generic) here. supabase-js v2.106's typed-query inference is fighting
+ * us in subtle ways for POC speed. Each query function casts its result
+ * to the right Row type from src/lib/db/types.ts.
  */
-let _client: SupabaseClient<Database> | null = null;
+let _client: SupabaseClient | null = null;
 
-export function getSupabase(): SupabaseClient<Database> {
+export function getSupabase(): SupabaseClient {
   if (_client) return _client;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,24 +25,8 @@ export function getSupabase(): SupabaseClient<Database> {
     );
   }
 
-  _client = createClient<Database>(url, key, {
+  _client = createClient(url, key, {
     realtime: { params: { eventsPerSecond: 10 } },
   });
   return _client;
 }
-
-/**
- * Convenience proxy — `supabase.from('clinics')` works as before.
- * The proxy resolves to the real client on first property access,
- * so we keep the ergonomic call sites without losing the lazy guarantee.
- */
-export const supabase = new Proxy(
-  {} as SupabaseClient<Database>,
-  {
-    get(_target, prop) {
-      const client = getSupabase() as unknown as Record<string | symbol, unknown>;
-      const value = client[prop];
-      return typeof value === "function" ? value.bind(client) : value;
-    },
-  },
-);

@@ -1,55 +1,140 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition, useCallback } from "react";
 import Link from "next/link";
-import { ChevronLeft, MapPin, RefreshCw, CheckCircle2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  ChevronLeft,
+  MapPin,
+  Plus,
+  Phone,
+  X,
+  Camera,
+  ChevronRight,
+  Share2,
+} from "lucide-react";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { Card } from "@/components/ui/Card";
 import { TokenChip } from "@/components/ui/TokenChip";
 import { SourceBadge } from "@/components/ui/SourceBadge";
-import { getClinicByCode, getActiveQueue } from "@/lib/db/queries";
+import { Button } from "@/components/ui/Button";
+import { Toast } from "@/components/ui/Toast";
+import {
+  getClinicByCode,
+  getActiveQueue,
+  callIn,
+  dropVisit,
+} from "@/lib/db/queries";
+import { getSupabase } from "@/lib/db/client";
 import type { Clinic, Visit } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
-/**
- * Live Queue · receptionist's home (Week 1 deliverable).
- * Pulls real data from Supabase. Polished but not yet interactive —
- * Week 2 adds realtime subscriptions, drop/call/save actions.
- */
+const CLINIC_CODE = "drmehta";
+
 export default function StaffQueuePage() {
+  const router = useRouter();
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [queue, setQueue] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    tone: "success" | "error" | "info";
+    title: string;
+    desc?: string;
+  } | null>(null);
+  const [dropConfirm, setDropConfirm] = useState<Visit | null>(null);
+  const [pending, startPending] = useTransition();
 
-  async function load() {
-    setLoading(true);
-    setError(null);
+  const load = useCallback(async () => {
     try {
-      const c = await getClinicByCode("drmehta");
+      const c = await getClinicByCode(CLINIC_CODE);
       if (!c) {
         setError(
-          "Couldn't find Dr. Mehta's Clinic. Did you run supabase/seed.sql in the SQL editor?",
+          "Couldn't find Dr. Mehta's Clinic. Run supabase/seed.sql first.",
         );
         return;
       }
       const q = await getActiveQueue(c.id);
       setClinic(c);
       setQueue(q);
+      setError(null);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Unknown error";
+      const msg = e instanceof Error ? e.message : "Couldn't load queue";
       setError(msg);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
+  // Initial load
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
+
+  // Realtime subscription — refetch on any visits-table change
+  useEffect(() => {
+    if (!clinic) return;
+    const channel = getSupabase()
+      .channel(`queue:${clinic.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "visits",
+          filter: `clinic_id=eq.${clinic.id}`,
+        },
+        () => {
+          void load();
+        },
+      )
+      .subscribe();
+    return () => {
+      void channel.unsubscribe();
+    };
+  }, [clinic, load]);
 
   const nowServing = queue.find((v) => v.status === "now_serving") ?? null;
   const waiting = queue.filter((v) => v.status === "waiting");
+
+  function handleCall(v: Visit) {
+    if (!clinic) return;
+    startPending(async () => {
+      try {
+        await callIn(v.id, clinic.id);
+        setToast({
+          tone: "success",
+          title: `${v.token} called in`,
+          desc: `${v.patient_name} is now with the doctor`,
+        });
+      } catch (e) {
+        const m = e instanceof Error ? e.message : "Couldn't call this patient";
+        setToast({ tone: "error", title: "Failed to call in", desc: m });
+      }
+    });
+  }
+
+  function handleDrop(v: Visit) {
+    setDropConfirm(null);
+    startPending(async () => {
+      try {
+        await dropVisit(v.id);
+        setToast({
+          tone: "info",
+          title: `${v.token} dropped`,
+          desc: `${v.patient_name} removed from the queue`,
+        });
+      } catch (e) {
+        const m = e instanceof Error ? e.message : "Couldn't drop";
+        setToast({ tone: "error", title: "Failed to drop", desc: m });
+      }
+    });
+  }
+
+  function handleSaveRx() {
+    if (!nowServing) return;
+    router.push(`/staff/visit/${nowServing.id}/save`);
+  }
 
   return (
     <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas">
@@ -62,47 +147,58 @@ export default function StaffQueuePage() {
         >
           <ChevronLeft size={22} className="text-text-primary" />
         </Link>
-        <div className="flex items-center gap-2.5 flex-1">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
           <SaralArch size={22} />
-          <div className="flex flex-col">
-            <span className="text-label-md font-semibold text-text-primary leading-tight">
+          <div className="flex flex-col min-w-0">
+            <span className="text-label-md font-semibold text-text-primary leading-tight truncate">
               {clinic?.name ?? "Loading…"}
             </span>
-            <span className="text-caption text-text-secondary leading-tight">
-              {clinic?.address ? (
-                <span className="inline-flex items-center gap-1">
-                  <MapPin size={10} />
-                  {clinic.address}
-                </span>
-              ) : (
-                "—"
-              )}
-            </span>
+            {clinic?.address && (
+              <span className="text-caption text-text-secondary leading-tight inline-flex items-center gap-1 truncate">
+                <MapPin size={10} className="flex-none" />
+                {clinic.address}
+              </span>
+            )}
           </div>
         </div>
         <button
-          onClick={load}
-          disabled={loading}
-          className="size-10 flex items-center justify-center rounded-full hover:bg-surface-sunken disabled:opacity-50"
-          aria-label="Refresh queue"
+          aria-label="Add walk-in"
+          className="h-10 px-3.5 inline-flex items-center gap-1.5 bg-surface-brand text-text-inverse rounded-full text-label-md font-semibold"
+          onClick={() => {
+            if (clinic) {
+              void navigator.clipboard.writeText(
+                `${window.location.origin}/walkin/${clinic.code}`,
+              );
+              setToast({
+                tone: "info",
+                title: "Walk-in link copied",
+                desc: "Share with patient or scan the printed QR",
+              });
+            }
+          }}
         >
-          <RefreshCw
-            size={18}
-            className={cn(
-              "text-text-secondary",
-              loading && "animate-spin",
-            )}
-          />
+          <Plus size={16} strokeWidth={2.5} />
+          Walk-in
         </button>
       </header>
 
+      {/* Top-of-screen toast */}
+      {toast && (
+        <div className="px-4 pt-3">
+          <Toast
+            tone={toast.tone}
+            title={toast.title}
+            description={toast.desc}
+            autoHide={4500}
+            onDismiss={() => setToast(null)}
+          />
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col p-4 gap-3">
-        {/* Error state */}
+        {/* Error */}
         {error && (
-          <Card
-            surface="raised"
-            className="p-4 border border-border-critical"
-          >
+          <Card surface="raised" bordered className="p-4 border-border-critical">
             <p className="text-label-md font-semibold text-text-critical mb-1">
               Something went wrong
             </p>
@@ -111,83 +207,242 @@ export default function StaffQueuePage() {
         )}
 
         {/* Now Serving */}
-        {nowServing && (
+        {nowServing ? (
           <Card surface="inverse" elevation="md" className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-label-sm font-medium text-text-inverse/70 uppercase tracking-wider">
                 Live · Now serving
               </span>
-              <span className="size-2 rounded-full bg-accent-500" />
+              <span className="size-2 rounded-full bg-accent-500 animate-pulse" />
             </div>
-            <div className="mt-3 flex items-baseline gap-3">
-              <span className="text-display-md font-bold text-text-inverse tnum">
+            <div className="mt-3 flex items-baseline gap-4">
+              <span
+                className="font-bold text-text-inverse tnum leading-none"
+                style={{ fontSize: "3rem" }}
+              >
                 {nowServing.token}
               </span>
-              <div className="flex flex-col">
-                <span className="text-label-lg font-medium text-text-inverse">
+              <div className="flex flex-col min-w-0">
+                <span className="text-label-lg font-medium text-text-inverse truncate">
                   {nowServing.patient_name}
                 </span>
-                <span className="text-caption text-text-inverse/60">
+                <span className="text-caption text-text-inverse/60 truncate">
                   {nowServing.gender} · {nowServing.age} ·{" "}
-                  {nowServing.reason}
+                  {nowServing.reason ?? "—"}
                 </span>
               </div>
             </div>
+
+            {/* Hero CTA */}
+            <button
+              onClick={handleSaveRx}
+              disabled={pending}
+              className={cn(
+                "mt-5 w-full h-12 flex items-center gap-3 px-4 rounded-xl",
+                "bg-surface-raised text-text-primary",
+                "transition-transform active:scale-[0.98]",
+                "disabled:opacity-50",
+              )}
+            >
+              <Camera size={20} className="text-accent-600 flex-none" />
+              <span className="flex-1 text-left text-label-lg font-medium">
+                Save prescription · call next
+              </span>
+              <ChevronRight size={20} className="text-text-secondary flex-none" />
+            </button>
           </Card>
+        ) : (
+          !loading && (
+            <Card surface="raised" className="p-6 flex flex-col items-center text-center gap-1">
+              <p className="text-h4 font-semibold text-text-primary">
+                No one in the chair
+              </p>
+              <p className="text-body-sm text-text-secondary">
+                Tap Call on a waiting row to bring them in.
+              </p>
+            </Card>
+          )
         )}
 
-        {/* Waiting list */}
-        <div className="flex items-center justify-between px-1 pt-2 pb-1">
+        {/* Waiting list header */}
+        <div className="flex items-center justify-between px-1 pt-2">
           <span className="text-label-lg font-semibold text-text-primary">
             {waiting.length} waiting
           </span>
           <span className="inline-flex items-center gap-1.5 text-caption text-text-tertiary">
             <span className="size-1.5 rounded-full bg-sage-500" />
-            Auto-updates
+            Live · auto-updates
           </span>
         </div>
 
+        {/* Waiting list */}
         {loading && waiting.length === 0 ? (
           <Card surface="raised" className="p-6 text-center">
             <p className="text-body-sm text-text-secondary">Loading queue…</p>
           </Card>
+        ) : waiting.length === 0 ? (
+          <EmptyWaiting clinicCode={clinic?.code ?? "drmehta"} />
         ) : (
-          <div className="flex flex-col divide-y divide-border-subtle border-y border-border-subtle bg-surface-canvas">
+          <div className="flex flex-col divide-y divide-border-subtle border-y border-border-subtle">
             {waiting.map((v) => (
-              <div
+              <QueueRow
                 key={v.id}
-                className="flex items-center gap-3 py-3"
-              >
-                <TokenChip>{v.token}</TokenChip>
-                <div className="flex-1 min-w-0">
-                  <p className="text-label-lg font-medium text-text-primary truncate">
-                    {v.patient_name}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <SourceBadge source={v.source} />
-                    <span className="text-caption text-text-tertiary truncate">
-                      {v.reason}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                visit={v}
+                onCall={() => handleCall(v)}
+                onDrop={() => setDropConfirm(v)}
+                disabled={pending}
+              />
             ))}
           </div>
         )}
-
-        {/* Week-1 stamp */}
-        {!loading && !error && (
-          <Card surface="brand-subtle" className="mt-auto p-3 flex items-center gap-2">
-            <CheckCircle2 size={18} className="text-text-brand flex-none" />
-            <p className="text-caption text-text-brand">
-              Connected to Supabase ·{" "}
-              {queue.length > 0
-                ? `${queue.length} live records loaded`
-                : "no live records yet"}
-            </p>
-          </Card>
-        )}
       </div>
+
+      {/* Drop confirm sheet */}
+      {dropConfirm && (
+        <DropConfirmSheet
+          visit={dropConfirm}
+          onConfirm={() => handleDrop(dropConfirm)}
+          onClose={() => setDropConfirm(null)}
+          pending={pending}
+        />
+      )}
     </main>
+  );
+}
+
+/* ============================================================
+   Sub-components
+   ============================================================ */
+
+function QueueRow({
+  visit,
+  onCall,
+  onDrop,
+  disabled,
+}: {
+  visit: Visit;
+  onCall: () => void;
+  onDrop: () => void;
+  disabled: boolean;
+}) {
+  const sourceMap = { online: "online", qr: "qr", phone: "phone" } as const;
+  return (
+    <div className="flex items-center gap-3 py-3">
+      <TokenChip>{visit.token}</TokenChip>
+      <div className="flex-1 min-w-0">
+        <p className="text-label-lg font-medium text-text-primary truncate">
+          {visit.patient_name}
+        </p>
+        <div className="flex items-center gap-2 mt-1 min-w-0">
+          <SourceBadge source={sourceMap[visit.source]} />
+          <span className="text-caption text-text-tertiary truncate min-w-0">
+            {visit.reason ?? "—"}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 flex-none">
+        <button
+          aria-label={`Drop ${visit.token}`}
+          onClick={onDrop}
+          disabled={disabled}
+          className="size-9 inline-flex items-center justify-center rounded-lg bg-surface-canvas border border-border-default hover:bg-surface-sunken transition-colors disabled:opacity-40"
+        >
+          <X size={18} className="text-text-secondary" />
+        </button>
+        <button
+          aria-label={`Call ${visit.token}`}
+          onClick={onCall}
+          disabled={disabled}
+          className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg bg-surface-brand text-text-inverse text-label-md font-semibold transition-transform active:scale-95 disabled:opacity-50"
+        >
+          <Phone size={16} />
+          Call
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EmptyWaiting({ clinicCode }: { clinicCode: string }) {
+  return (
+    <Card surface="raised" className="p-6 flex flex-col items-center gap-3 text-center">
+      <SaralArch size={36} />
+      <p className="text-h4 font-semibold text-text-primary">
+        Queue is empty
+      </p>
+      <p className="text-body-sm text-text-secondary">
+        Patients can self-check-in by scanning the QR at reception.
+      </p>
+      <Button
+        variant="secondary"
+        size="md"
+        leadingIcon={<Share2 size={16} />}
+        onClick={() => {
+          void navigator.clipboard.writeText(
+            `${window.location.origin}/walkin/${clinicCode}`,
+          );
+        }}
+      >
+        Copy walk-in link
+      </Button>
+    </Card>
+  );
+}
+
+function DropConfirmSheet({
+  visit,
+  onConfirm,
+  onClose,
+  pending,
+}: {
+  visit: Visit;
+  onConfirm: () => void;
+  onClose: () => void;
+  pending: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <button
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 bg-surface-inverse/55"
+      />
+      <div className="relative w-full max-w-md bg-surface-canvas rounded-t-3xl px-5 pt-3 pb-8 shadow-lg">
+        <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-border-default" />
+        <div className="flex items-center gap-2 mb-1">
+          <TokenChip size="sm">{visit.token}</TokenChip>
+          <span className="text-label-md font-semibold text-text-primary">
+            {visit.patient_name}
+          </span>
+        </div>
+        <p className="mt-3 text-h3 font-bold text-text-primary">
+          Did {visit.patient_name.split(" ")[0]} leave?
+        </p>
+        <p className="mt-1 text-body-sm text-text-secondary">
+          Quick call confirms it. We never drop a patient silently — the human
+          touch matters.
+        </p>
+        <div className="mt-5 flex flex-col gap-2">
+          <a
+            href={visit.mobile ? `tel:+91${visit.mobile.replace(/^\+?91/, "")}` : "#"}
+            className={cn(
+              "h-12 inline-flex items-center justify-center gap-2 rounded-xl",
+              "bg-surface-brand text-text-inverse text-label-lg font-semibold",
+              "transition-transform active:scale-[0.98]",
+            )}
+          >
+            <Phone size={18} />
+            Call {visit.patient_name.split(" ")[0]} to confirm
+          </a>
+          <button
+            onClick={onConfirm}
+            disabled={pending}
+            className="h-12 text-text-critical text-label-md font-semibold disabled:opacity-50"
+          >
+            {pending ? "Dropping…" : "Skip & drop from queue"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
