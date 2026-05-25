@@ -203,10 +203,19 @@ html, body {
   color: var(--color-primary-900);
 }
 
+/* Default focus ring for buttons / links / icon-buttons / chips.
+   Form fields are excluded — they manage their own focus via their
+   wrapper, since a tiny radius outline inside a large-radius pill
+   reads as "border inside the input" instead of a halo around it. */
 *:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 
 /* ============================================================

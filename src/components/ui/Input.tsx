@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, forwardRef, ReactNode } from "react";
+import { InputHTMLAttributes, forwardRef, ReactNode, useId } from "react";
 import { cn } from "@/lib/utils";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -12,10 +12,24 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, helperText, errorText, leading, trailing, className, id, ...props }, ref) => {
-    const reactId = (props as { name?: string }).name ?? "input";
+  (
+    {
+      label,
+      helperText,
+      errorText,
+      leading,
+      trailing,
+      className,
+      id,
+      ...props
+    },
+    ref,
+  ) => {
+    const reactId = useId();
     const fieldId = id ?? `field-${reactId}`;
+    const helperId = `${fieldId}-help`;
     const hasError = Boolean(errorText);
+    const describedBy = helperText || errorText ? helperId : undefined;
 
     return (
       <div className="flex flex-col gap-1.5">
@@ -29,34 +43,56 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
         <div
           className={cn(
-            "flex items-center gap-2.5 h-12 rounded-xl bg-surface-canvas border px-3",
-            "transition-colors",
+            "group flex items-center gap-2.5 h-12 rounded-xl bg-surface-canvas border px-3",
+            "transition-[box-shadow,border-color] duration-150 ease-out",
+            // Default & focus ring colors driven by state
             hasError
-              ? "border-border-critical focus-within:border-border-critical"
-              : "border-border-default focus-within:border-border-focus",
+              ? "border-border-critical focus-within:border-border-critical focus-within:shadow-[0_0_0_3px_var(--color-sindoor-100)]"
+              : "border-border-default hover:border-border-strong focus-within:border-border-focus focus-within:shadow-[0_0_0_3px_var(--color-primary-100)]",
             className,
           )}
         >
           {leading && (
-            <span className="flex-none text-text-secondary">{leading}</span>
+            <span
+              className={cn(
+                "flex-none transition-colors",
+                hasError
+                  ? "text-text-critical"
+                  : "text-text-secondary group-focus-within:text-text-brand",
+              )}
+            >
+              {leading}
+            </span>
           )}
           <input
             ref={ref}
             id={fieldId}
+            aria-invalid={hasError || undefined}
+            aria-describedby={describedBy}
             className={cn(
-              "flex-1 bg-transparent outline-none placeholder:text-text-tertiary",
-              "text-body-md text-text-primary",
+              "flex-1 min-w-0 bg-transparent border-none outline-none",
+              "text-body-md text-text-primary placeholder:text-text-tertiary",
+              // Strip the iOS native styling that lightens inputs on autofill
+              "autofill:shadow-[inset_0_0_0_1000px_var(--color-surface-canvas)]",
             )}
             {...props}
           />
           {trailing && (
-            <span className="flex-none text-text-secondary">{trailing}</span>
+            <span
+              className={cn(
+                "flex-none",
+                hasError ? "text-text-critical" : "text-text-secondary",
+              )}
+            >
+              {trailing}
+            </span>
           )}
         </div>
         {(helperText || errorText) && (
           <p
+            id={helperId}
             className={cn(
-              "text-caption",
+              "text-caption leading-snug",
               hasError ? "text-text-critical" : "text-text-tertiary",
             )}
           >
