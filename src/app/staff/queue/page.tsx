@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, useCallback, useMemo } from "react";
+import { useEffect, useState, useTransition, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,6 +12,7 @@ import {
   Share2,
   CheckCircle2,
   ChevronRight,
+  MessageSquare,
 } from "lucide-react";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { Card } from "@/components/ui/Card";
@@ -46,12 +47,18 @@ export default function StaffQueuePage() {
     tone: "success" | "error" | "info";
     title: string;
     desc?: string;
+    action?: { label: string; onClick: () => void };
   } | null>(null);
   const [dropConfirm, setDropConfirm] = useState<Visit | null>(null);
   const [pending, startPending] = useTransition();
   const [tab, setTab] = useState<TabKey>("waiting");
   const [search, setSearch] = useState("");
   const [now, setNow] = useState(() => new Date());
+
+  // Track known visit IDs so realtime can detect true INSERTs vs initial load
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  // Suppress walk-in toast on the very first realtime payload after subscribe
+  const subscribedAtRef = useRef<number>(0);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -71,6 +78,12 @@ export default function StaffQueuePage() {
         getActiveQueue(c.id),
         getTodayVisits(c.id),
       ]);
+      // Seed known IDs from the initial load so we don't fire toasts retroactively
+      const ids = new Set<string>();
+      q.forEach((v) => ids.add(v.id));
+      t.forEach((v) => ids.add(v.id));
+      knownIdsRef.current = ids;
+
       setClinic(c);
       setQueue(q);
       setTodayAll(t);
@@ -87,8 +100,11 @@ export default function StaffQueuePage() {
     void load();
   }, [load]);
 
+  // Realtime: refetch on any change. Separately, detect new walk-in
+  // INSERTs to fire a contextual "X just joined via QR" toast.
   useEffect(() => {
     if (!clinic) return;
+    subscribedAtRef.current = Date.now();
     const channel = getSupabase()
       .channel(`queue:${clinic.id}`)
       .on(
@@ -99,13 +115,39 @@ export default function StaffQueuePage() {
           table: "visits",
           filter: `clinic_id=eq.${clinic.id}`,
         },
-        () => void load(),
+        (payload) => {
+          if (
+            payload.eventType === "INSERT" &&
+            payload.new &&
+            typeof payload.new === "object"
+          ) {
+            const v = payload.new as Visit;
+            // Only fire if this id wasn't part of our last fetch
+            if (!knownIdsRef.current.has(v.id) && v.source === "qr") {
+              const ago = Date.now() - subscribedAtRef.current;
+              // Suppress toast for first 1.5s after subscribe to avoid
+              // replay-of-recent-events flicker
+              if (ago > 1500) {
+                setToast({
+                  tone: "info",
+                  title: `${v.patient_name.split(" ")[0]} just joined via QR`,
+                  desc: `${v.token} added to the queue`,
+                  action: {
+                    label: "Open",
+                    onClick: () => router.push(`/staff/patient/${v.mobile ?? v.id}`),
+                  },
+                });
+              }
+            }
+          }
+          void load();
+        },
       )
       .subscribe();
     return () => {
       void channel.unsubscribe();
     };
-  }, [clinic, load]);
+  }, [clinic, load, router]);
 
   const nowServing = queue.find((v) => v.status === "now_serving") ?? null;
   const waiting = useMemo(
@@ -186,6 +228,23 @@ export default function StaffQueuePage() {
     handleCall(next);
   }
 
+  function handleSendWhatsapp(v: Visit) {
+    if (!v.mobile) {
+      setToast({
+        tone: "error",
+        title: "No mobile on file",
+        desc: "Add a mobile number to send the link",
+      });
+      return;
+    }
+    const url = `${window.location.origin}/v/${encodeURIComponent(v.token)}`;
+    const msg = `Your live visit link at Dr. Mehta's Clinic — track your queue position here: ${url}`;
+    const cleaned = v.mobile.replace(/^\+?91/, "").replace(/\D/g, "");
+    const intl = `91${cleaned}`;
+    const wa = `https://wa.me/${intl}?text=${encodeURIComponent(msg)}`;
+    window.open(wa, "_blank", "noopener,noreferrer");
+  }
+
   function timerStr(startedAt: string | null): string | null {
     if (!startedAt) return null;
     const started = new Date(startedAt).getTime();
@@ -220,7 +279,6 @@ export default function StaffQueuePage() {
 
   return (
     <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas">
-      {/* Top app bar */}
       <header className="flex items-center px-4 h-16 bg-surface-canvas sticky top-0 z-10 border-b border-border-subtle">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <SaralArch size={28} />
@@ -264,18 +322,18 @@ export default function StaffQueuePage() {
       </header>
 
       {toast && (
-        <div className="px-4 pt-3">
+        <div className="px-4 pt-3 animate-in fade-in slide-in-from-top-2 duration-200">
           <Toast
             tone={toast.tone}
             title={toast.title}
             description={toast.desc}
-            autoHide={4500}
+            action={toast.action}
+            autoHide={6000}
             onDismiss={() => setToast(null)}
           />
         </div>
       )}
 
-      {/* Content — pb-24 leaves room for fixed bottom nav */}
       <div className="flex-1 flex flex-col px-4 pt-4 gap-4 pb-24">
         {error && (
           <Card surface="raised" bordered className="p-4 border-border-critical">
@@ -286,7 +344,6 @@ export default function StaffQueuePage() {
           </Card>
         )}
 
-        {/* Now Serving — only shown on Waiting tab */}
         {tab === "waiting" && (
           nowServing ? (
             <Card surface="raised" bordered elevation="sm" className="p-5">
@@ -387,7 +444,6 @@ export default function StaffQueuePage() {
           )
         )}
 
-        {/* Tabs */}
         <SegmentedTabs
           tabs={[
             { key: "waiting", label: "Waiting", count: waiting.length },
@@ -398,10 +454,8 @@ export default function StaffQueuePage() {
           onChange={(k) => setTab(k as TabKey)}
         />
 
-        {/* Search */}
         <SearchBar value={search} onChange={setSearch} />
 
-        {/* List header */}
         <div className="flex items-center justify-between px-1 pt-1">
           <span className="text-label-lg font-semibold text-text-primary">
             {tab === "waiting"
@@ -416,7 +470,6 @@ export default function StaffQueuePage() {
           </span>
         </div>
 
-        {/* The list itself */}
         {loading && filteredList.length === 0 ? (
           <Card surface="raised" className="p-6 text-center">
             <p className="text-body-sm text-text-secondary">Loading…</p>
@@ -446,10 +499,24 @@ export default function StaffQueuePage() {
                   eta={etaFor(idx)}
                   onCall={() => handleCall(v)}
                   onDrop={() => setDropConfirm(v)}
+                  onSendWhatsapp={() => handleSendWhatsapp(v)}
+                  onOpenHistory={() =>
+                    router.push(
+                      `/staff/patient/${encodeURIComponent(v.mobile ?? v.id)}`,
+                    )
+                  }
                   disabled={pending}
                 />
               ) : (
-                <PastRow key={v.id} visit={v} />
+                <PastRow
+                  key={v.id}
+                  visit={v}
+                  onClick={() =>
+                    router.push(
+                      `/staff/patient/${encodeURIComponent(v.mobile ?? v.id)}`,
+                    )
+                  }
+                />
               ),
             )}
           </div>
@@ -471,7 +538,7 @@ export default function StaffQueuePage() {
 }
 
 /* ============================================================
-   Queue row (Waiting tab) — Drop X · Phone · ⋮ (left → right)
+   Sub-components
    ============================================================ */
 
 function QueueRow({
@@ -479,38 +546,48 @@ function QueueRow({
   eta,
   onCall,
   onDrop,
+  onSendWhatsapp,
+  onOpenHistory,
   disabled,
 }: {
   visit: Visit;
   eta: string;
   onCall: () => void;
   onDrop: () => void;
+  onSendWhatsapp: () => void;
+  onOpenHistory: () => void;
   disabled: boolean;
 }) {
   const sourceMap = { online: "online", qr: "qr", phone: "phone" } as const;
   const numberPart = visit.token.replace(/^T-?/, "");
-  return (
-    <div className="flex items-center gap-3 py-3">
-      <div className="size-11 rounded-lg bg-surface-sunken flex flex-col items-center justify-center flex-none tnum leading-none">
-        <span className="text-[10px] font-medium text-text-tertiary mt-0.5">T</span>
-        <span className="text-label-md font-semibold text-text-primary mt-0.5">
-          {numberPart}
-        </span>
-      </div>
+  const [menuOpen, setMenuOpen] = useState(false);
 
-      <div className="flex-1 min-w-0">
-        <p className="text-label-lg font-semibold text-text-primary truncate">
-          {visit.patient_name}
-        </p>
-        <div className="flex items-center gap-2 mt-1 min-w-0 text-caption text-text-tertiary">
-          <SourceBadge source={sourceMap[visit.source]} />
-          <span aria-hidden className="size-0.5 rounded-full bg-border-default flex-none" />
-          <span className="truncate min-w-0">{eta}</span>
+  return (
+    <div className="relative flex items-center gap-3 py-3">
+      <button
+        onClick={onOpenHistory}
+        aria-label={`Open ${visit.patient_name}'s history`}
+        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+      >
+        <div className="size-11 rounded-lg bg-surface-sunken flex flex-col items-center justify-center flex-none tnum leading-none">
+          <span className="text-[10px] font-medium text-text-tertiary mt-0.5">T</span>
+          <span className="text-label-md font-semibold text-text-primary mt-0.5">
+            {numberPart}
+          </span>
         </div>
-      </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-label-lg font-semibold text-text-primary truncate">
+            {visit.patient_name}
+          </p>
+          <div className="flex items-center gap-2 mt-1 min-w-0 text-caption text-text-tertiary">
+            <SourceBadge source={sourceMap[visit.source]} />
+            <span aria-hidden className="size-0.5 rounded-full bg-border-default flex-none" />
+            <span className="truncate min-w-0">{eta}</span>
+          </div>
+        </div>
+      </button>
 
       <div className="flex items-center gap-1 flex-none">
-        {/* Drop (X) — LEFT */}
         <button
           aria-label={`Drop ${visit.token}`}
           onClick={onDrop}
@@ -523,7 +600,6 @@ function QueueRow({
         >
           <X size={16} className="text-text-secondary" />
         </button>
-        {/* Call (Phone) — RIGHT */}
         <button
           aria-label={`Call ${visit.token}`}
           onClick={onCall}
@@ -537,31 +613,68 @@ function QueueRow({
         >
           <Phone size={16} strokeWidth={2.2} />
         </button>
-        {/* More menu — far right */}
-        <button
-          aria-label={`More actions for ${visit.token}`}
-          className={cn(
-            "size-9 inline-flex items-center justify-center rounded-lg",
-            "hover:bg-surface-sunken transition-colors text-text-tertiary",
+        <div className="relative">
+          <button
+            aria-label={`More actions for ${visit.token}`}
+            onClick={() => setMenuOpen((o) => !o)}
+            className={cn(
+              "size-9 inline-flex items-center justify-center rounded-lg",
+              "hover:bg-surface-sunken transition-colors text-text-tertiary",
+            )}
+          >
+            <MoreVertical size={16} />
+          </button>
+          {menuOpen && (
+            <>
+              <button
+                aria-label="Close menu"
+                onClick={() => setMenuOpen(false)}
+                className="fixed inset-0 z-10 cursor-default"
+              />
+              <div
+                className="absolute right-0 top-10 z-20 w-52 bg-surface-canvas border border-border-default rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                role="menu"
+              >
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onSendWhatsapp();
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-3 text-label-md text-text-primary hover:bg-surface-sunken transition-colors text-left"
+                  role="menuitem"
+                >
+                  <MessageSquare size={16} className="text-text-success" />
+                  Send link on WhatsApp
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onOpenHistory();
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-3 text-label-md text-text-primary hover:bg-surface-sunken transition-colors text-left border-t border-border-subtle"
+                  role="menuitem"
+                >
+                  <ChevronRight size={16} className="text-text-secondary" />
+                  Open patient history
+                </button>
+              </div>
+            </>
           )}
-        >
-          <MoreVertical size={16} />
-        </button>
+        </div>
       </div>
     </div>
   );
 }
 
-/* ============================================================
-   Past visit row — used in Done / All tabs
-   ============================================================ */
-
-function PastRow({ visit }: { visit: Visit }) {
+function PastRow({ visit, onClick }: { visit: Visit; onClick: () => void }) {
   const numberPart = visit.token.replace(/^T-?/, "");
   const statusMap = {
     done: { label: "Done", classes: "bg-sage-100 text-text-success" },
     dropped: { label: "Dropped", classes: "bg-sindoor-50 text-text-critical" },
-    now_serving: { label: "In room", classes: "bg-surface-brand-subtle text-text-brand" },
+    now_serving: {
+      label: "In room",
+      classes: "bg-surface-brand-subtle text-text-brand",
+    },
     waiting: { label: "Waiting", classes: "bg-surface-sunken text-text-secondary" },
   } as const;
   const s = statusMap[visit.status];
@@ -581,7 +694,10 @@ function PastRow({ visit }: { visit: Visit }) {
       : null;
 
   return (
-    <div className="flex items-center gap-3 py-3">
+    <button
+      onClick={onClick}
+      className="flex items-center gap-3 py-3 text-left w-full hover:bg-surface-raised transition-colors -mx-1 px-1 rounded-md"
+    >
       <div className="size-11 rounded-lg bg-surface-sunken flex flex-col items-center justify-center flex-none tnum leading-none">
         <span className="text-[10px] font-medium text-text-tertiary mt-0.5">T</span>
         <span className="text-label-md font-semibold text-text-primary mt-0.5">
@@ -614,7 +730,7 @@ function PastRow({ visit }: { visit: Visit }) {
       </div>
 
       <ChevronRight size={18} className="text-text-tertiary flex-none" />
-    </div>
+    </button>
   );
 }
 
@@ -682,9 +798,14 @@ function DropConfirmSheet({
       <button
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-surface-inverse/55"
+        className="absolute inset-0 bg-surface-inverse/55 animate-in fade-in duration-200"
       />
-      <div className="relative w-full max-w-md bg-surface-canvas rounded-t-3xl px-5 pt-3 pb-8 shadow-lg">
+      <div
+        className={cn(
+          "relative w-full max-w-md bg-surface-canvas rounded-t-3xl px-5 pt-3 pb-8 shadow-lg",
+          "animate-in slide-in-from-bottom duration-300 ease-out",
+        )}
+      >
         <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-border-default" />
         <div className="flex items-center gap-2 mb-1">
           <span className="inline-flex items-center justify-center h-7 px-2 rounded-md bg-surface-sunken text-text-primary text-label-sm font-semibold tnum">

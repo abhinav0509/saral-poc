@@ -28,13 +28,21 @@ export function StaffBottomNav({
 }) {
   const pathname = usePathname();
   const items: (NavItem & { key: NonNullable<typeof active> })[] = [
-    { key: "home",     label: "Home",     href: "/",            icon: <Home size={22} strokeWidth={2} /> },
-    { key: "queue",    label: "Queue",    href: "/staff/queue", icon: <List size={22} strokeWidth={2} /> },
-    { key: "calendar", label: "Calendar", href: "/staff/queue", icon: <Calendar size={22} strokeWidth={2} /> },
-    { key: "more",     label: "More",     href: "/staff/queue", icon: <MoreHorizontal size={22} strokeWidth={2} /> },
+    { key: "home",     label: "Home",     href: "/staff",          icon: <Home size={22} strokeWidth={2} /> },
+    { key: "queue",    label: "Queue",    href: "/staff/queue",    icon: <List size={22} strokeWidth={2} /> },
+    { key: "calendar", label: "Calendar", href: "/staff/calendar", icon: <Calendar size={22} strokeWidth={2} /> },
+    { key: "more",     label: "More",     href: "/staff",          icon: <MoreHorizontal size={22} strokeWidth={2} /> },
   ];
 
-  const activeTab = active ?? (pathname?.startsWith("/staff/queue") ? "queue" : "home");
+  const activeTab =
+    active ??
+    (pathname === "/staff" || pathname === "/staff/"
+      ? "home"
+      : pathname?.startsWith("/staff/queue")
+        ? "queue"
+        : pathname?.startsWith("/staff/calendar")
+          ? "calendar"
+          : "home");
 
   return (
     <nav

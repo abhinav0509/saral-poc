@@ -51,6 +51,44 @@ export async function getTodayVisits(clinicId: string): Promise<Visit[]> {
   return (data as Visit[] | null) ?? [];
 }
 
+/**
+ * All visits for a clinic across a date range — used by the calendar.
+ */
+export async function getVisitsBetween(
+  clinicId: string,
+  from: Date,
+  to: Date,
+): Promise<Visit[]> {
+  const { data, error } = await getSupabase()
+    .from("visits")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .gte("created_at", from.toISOString())
+    .lt("created_at", to.toISOString())
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data as Visit[] | null) ?? [];
+}
+
+/**
+ * All past visits for a patient, identified by mobile number.
+ * Used by the Patient History viewer.
+ */
+export async function getPatientHistoryByMobile(
+  mobile: string,
+  clinicId: string,
+): Promise<Visit[]> {
+  const cleaned = mobile.replace(/\D/g, "");
+  const { data, error } = await getSupabase()
+    .from("visits")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .eq("mobile", cleaned)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as Visit[] | null) ?? [];
+}
+
 export async function getNowServing(clinicId: string): Promise<Visit | null> {
   const { data, error } = await getSupabase()
     .from("visits")

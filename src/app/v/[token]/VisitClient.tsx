@@ -17,6 +17,7 @@ import { Toast } from "@/components/ui/Toast";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { BrowserChrome } from "@/components/patient/BrowserChrome";
 import { cancelVisit, getQueueContext, getPrescriptionForVisit, getVisitByToken } from "@/lib/db/queries";
+import { getSupabase } from "@/lib/db/client";
 import type { Clinic, Visit, Prescription } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,8 @@ interface VisitClientProps {
   clinic: Clinic;
 }
 
-const POLL_INTERVAL_MS = 5000;
+// Polling as a safety net only — realtime is the primary update mechanism
+const POLL_INTERVAL_MS = 30000;
 
 export function VisitClient({ initialVisit, clinic }: VisitClientProps) {
   const [visit, setVisit] = useState(initialVisit);
@@ -45,26 +47,56 @@ export function VisitClient({ initialVisit, clinic }: VisitClientProps) {
       const ctx = await getQueueContext(fresh);
       setAheadCount(ctx.aheadCount);
       setEtaMinutes(ctx.etaMinutes);
-      // Build a mini queue strip: now-serving + 4 closest waiting around us
-      const allActive = ctx.queue;
-      setMiniQueue(buildMiniQueue(allActive, fresh));
-      // If visit is done, fetch prescription
+      setMiniQueue(buildMiniQueue(ctx.queue, fresh));
       if (fresh.status === "done") {
         const rx = await getPrescriptionForVisit(fresh.id);
         setPrescription(rx);
       }
     } catch (e) {
-      // Soft fail — don't block the UI; will retry on next interval
       console.error("[visit] refresh failed", e);
     }
   }
 
+  // Initial load + slow poll as a safety net
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, POLL_INTERVAL_MS);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visit.token]);
+
+  // Realtime: refresh on ANY visit row change in our clinic.
+  // This is what makes the patient page update instantly when staff
+  // calls them in or saves their prescription.
+  useEffect(() => {
+    const channel = getSupabase()
+      .channel(`patient:${visit.clinic_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "visits",
+          filter: `clinic_id=eq.${visit.clinic_id}`,
+        },
+        () => void refresh(),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "prescriptions",
+          filter: `visit_id=eq.${visit.id}`,
+        },
+        () => void refresh(),
+      )
+      .subscribe();
+    return () => {
+      void channel.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visit.id, visit.clinic_id]);
 
   function onCancel() {
     setConfirmingCancel(false);
