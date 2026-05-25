@@ -388,35 +388,26 @@ export default function StaffQueuePage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="mt-4">
                 <button
                   onClick={handleSaveRx}
                   disabled={pending}
                   className={cn(
-                    "h-11 inline-flex items-center justify-center gap-2 rounded-xl",
-                    "bg-surface-canvas border border-border-default",
-                    "text-label-md font-semibold text-text-primary",
-                    "transition-colors hover:bg-surface-sunken active:bg-surface-sunken",
-                    "disabled:opacity-50",
-                  )}
-                >
-                  <Camera size={18} className="text-accent-600" />
-                  Save Rx
-                </button>
-                <button
-                  onClick={handleCallNext}
-                  disabled={pending || waiting.length === 0}
-                  className={cn(
-                    "h-11 inline-flex items-center justify-center gap-2 rounded-xl",
+                    "w-full h-12 inline-flex items-center justify-center gap-2 rounded-xl",
                     "bg-surface-brand text-white",
-                    "text-label-md font-semibold",
-                    "transition-transform active:scale-95",
+                    "text-label-lg font-semibold",
+                    "transition-transform active:scale-[0.98]",
                     "disabled:opacity-50",
                   )}
                 >
-                  <Phone size={18} />
-                  Call next
+                  <Camera size={18} />
+                  Save Rx &amp; call next
                 </button>
+                {waiting.length > 0 && (
+                  <p className="mt-2 text-caption text-text-tertiary text-center">
+                    Next up · {waiting[0].token} {waiting[0].patient_name}
+                  </p>
+                )}
               </div>
             </Card>
           ) : (
