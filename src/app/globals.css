@@ -97,7 +97,8 @@
   --color-text-primary:   var(--color-neutral-950);
   --color-text-secondary: var(--color-neutral-600);
   --color-text-tertiary:  var(--color-neutral-400);
-  --color-text-inverse:   var(--color-neutral-0);
+  /* Pure white for inverse text — warm cream (#FAF8F4) read too dim on teal CTAs */
+  --color-text-inverse:   #FFFFFF;
   --color-text-brand:     var(--color-primary-500);
   --color-text-accent:    var(--color-accent-600);
   --color-text-success:   var(--color-sage-700);

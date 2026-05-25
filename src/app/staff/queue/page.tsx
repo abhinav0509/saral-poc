@@ -497,7 +497,7 @@ export default function StaffQueuePage() {
                   key={v.id}
                   visit={v}
                   eta={etaFor(idx)}
-                  onCall={() => handleCall(v)}
+                  onBringIn={() => handleCall(v)}
                   onDrop={() => setDropConfirm(v)}
                   onSendWhatsapp={() => handleSendWhatsapp(v)}
                   onOpenHistory={() =>
@@ -544,7 +544,7 @@ export default function StaffQueuePage() {
 function QueueRow({
   visit,
   eta,
-  onCall,
+  onBringIn,
   onDrop,
   onSendWhatsapp,
   onOpenHistory,
@@ -552,7 +552,7 @@ function QueueRow({
 }: {
   visit: Visit;
   eta: string;
-  onCall: () => void;
+  onBringIn: () => void;
   onDrop: () => void;
   onSendWhatsapp: () => void;
   onOpenHistory: () => void;
@@ -561,6 +561,10 @@ function QueueRow({
   const sourceMap = { online: "online", qr: "qr", phone: "phone" } as const;
   const numberPart = visit.token.replace(/^T-?/, "");
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const dialerHref = visit.mobile
+    ? `tel:+91${visit.mobile.replace(/^\+?91/, "").replace(/\D/g, "")}`
+    : null;
 
   return (
     <div className="relative flex items-center gap-3 py-3">
@@ -600,19 +604,31 @@ function QueueRow({
         >
           <X size={16} className="text-text-secondary" />
         </button>
-        <button
-          aria-label={`Call ${visit.token}`}
-          onClick={onCall}
-          disabled={disabled}
-          className={cn(
-            "size-9 inline-flex items-center justify-center rounded-full",
-            "bg-surface-brand-subtle text-text-brand",
-            "transition-transform active:scale-90 hover:bg-primary-100",
-            "disabled:opacity-40",
-          )}
-        >
-          <Phone size={16} strokeWidth={2.2} />
-        </button>
+        {dialerHref ? (
+          <a
+            href={dialerHref}
+            aria-label={`Call ${visit.patient_name} on phone`}
+            className={cn(
+              "size-9 inline-flex items-center justify-center rounded-full",
+              "bg-surface-brand-subtle text-text-brand",
+              "transition-transform active:scale-90 hover:bg-primary-100",
+            )}
+          >
+            <Phone size={16} strokeWidth={2.2} />
+          </a>
+        ) : (
+          <button
+            aria-label="No mobile on file"
+            disabled
+            title="No mobile number on file"
+            className={cn(
+              "size-9 inline-flex items-center justify-center rounded-full",
+              "bg-surface-sunken text-text-tertiary opacity-50 cursor-not-allowed",
+            )}
+          >
+            <Phone size={16} strokeWidth={2.2} />
+          </button>
+        )}
         <div className="relative">
           <button
             aria-label={`More actions for ${visit.token}`}
@@ -632,15 +648,27 @@ function QueueRow({
                 className="fixed inset-0 z-10 cursor-default"
               />
               <div
-                className="absolute right-0 top-10 z-20 w-52 bg-surface-canvas border border-border-default rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                className="absolute right-0 top-10 z-20 w-56 bg-surface-canvas border border-border-default rounded-xl shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150"
                 role="menu"
               >
                 <button
                   onClick={() => {
                     setMenuOpen(false);
+                    onBringIn();
+                  }}
+                  disabled={disabled}
+                  className="w-full flex items-center gap-3 px-3 py-3 text-label-md text-text-primary hover:bg-surface-sunken transition-colors text-left disabled:opacity-50"
+                  role="menuitem"
+                >
+                  <CheckCircle2 size={16} className="text-text-brand" />
+                  Bring into chair now
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
                     onSendWhatsapp();
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-3 text-label-md text-text-primary hover:bg-surface-sunken transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-3 py-3 text-label-md text-text-primary hover:bg-surface-sunken transition-colors text-left border-t border-border-subtle"
                   role="menuitem"
                 >
                   <MessageSquare size={16} className="text-text-success" />
