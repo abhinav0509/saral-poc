@@ -47,7 +47,7 @@ export function SegmentedTabs({ tabs, active, onChange, className }: SegmentedTa
           >
             {tab.label}
             {typeof tab.count === "number" && isActive && (
-              <span className="inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full bg-surface-brand text-text-inverse text-[11px] font-semibold tnum">
+              <span className="inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full bg-surface-brand text-white text-[11px] font-semibold tnum">
                 {tab.count}
               </span>
             )}

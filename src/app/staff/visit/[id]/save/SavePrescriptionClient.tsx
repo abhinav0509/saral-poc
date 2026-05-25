@@ -316,7 +316,7 @@ export function SavePrescriptionClient({
             <button
               onClick={addMed}
               disabled={!newMedName.trim()}
-              className="size-11 flex items-center justify-center rounded-xl bg-surface-brand text-text-inverse disabled:opacity-40"
+              className="size-11 flex items-center justify-center rounded-xl bg-surface-brand text-white disabled:opacity-40"
               aria-label="Add medicine"
             >
               <Plus size={20} />

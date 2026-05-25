@@ -177,7 +177,7 @@ export function CalendarClient({
       {/* FAB · new booking */}
       <Link
         href="/staff/booking/new"
-        className="fixed bottom-20 right-4 z-30 size-14 rounded-full bg-surface-brand text-text-inverse flex items-center justify-center shadow-lg transition-transform active:scale-95"
+        className="fixed bottom-20 right-4 z-30 size-14 rounded-full bg-surface-brand text-white flex items-center justify-center shadow-lg transition-transform active:scale-95"
         aria-label="New booking"
       >
         <Plus size={24} strokeWidth={2.4} />

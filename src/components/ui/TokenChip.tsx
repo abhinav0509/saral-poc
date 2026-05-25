@@ -14,7 +14,7 @@ interface TokenChipProps {
 const TONE_STYLES: Record<Tone, string> = {
   default: "bg-surface-sunken text-text-primary",
   inverse: "bg-white/10 text-text-inverse",
-  brand: "bg-surface-brand text-text-inverse",
+  brand: "bg-surface-brand text-white",
   accent: "bg-surface-accent-subtle text-text-accent",
 };
 

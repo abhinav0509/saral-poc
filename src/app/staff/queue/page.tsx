@@ -308,7 +308,7 @@ export default function StaffQueuePage() {
         <Link
           href="/staff/walkin"
           aria-label="Add walk-in patient"
-          className="h-9 px-3 mr-2 inline-flex items-center gap-1.5 bg-surface-brand text-text-inverse rounded-full text-label-sm font-semibold transition-transform active:scale-95"
+          className="h-9 px-3 mr-2 inline-flex items-center gap-1.5 bg-surface-brand text-white rounded-full text-label-sm font-semibold transition-transform active:scale-95"
         >
           <Plus size={16} strokeWidth={2.5} />
           Walk-in
@@ -408,7 +408,7 @@ export default function StaffQueuePage() {
                   disabled={pending || waiting.length === 0}
                   className={cn(
                     "h-11 inline-flex items-center justify-center gap-2 rounded-xl",
-                    "bg-surface-brand text-text-inverse",
+                    "bg-surface-brand text-white",
                     "text-label-md font-semibold",
                     "transition-transform active:scale-95",
                     "disabled:opacity-50",
@@ -857,7 +857,7 @@ function DropConfirmSheet({
             href={visit.mobile ? `tel:+91${visit.mobile.replace(/^\+?91/, "")}` : "#"}
             className={cn(
               "h-12 inline-flex items-center justify-center gap-2 rounded-xl",
-              "bg-surface-brand text-text-inverse text-label-lg font-semibold",
+              "bg-surface-brand text-white text-label-lg font-semibold",
               "transition-transform active:scale-[0.98]",
             )}
           >

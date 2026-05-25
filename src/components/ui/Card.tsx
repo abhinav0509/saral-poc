@@ -15,7 +15,7 @@ const SURFACE_STYLES: Record<Surface, string> = {
   canvas: "bg-surface-canvas text-text-primary",
   raised: "bg-surface-raised text-text-primary",
   inverse: "bg-surface-inverse text-text-inverse",
-  brand: "bg-surface-brand text-text-inverse",
+  brand: "bg-surface-brand text-white",
   "brand-subtle": "bg-surface-brand-subtle text-text-brand",
   "accent-subtle": "bg-surface-accent-subtle text-text-accent",
 };

@@ -17,13 +17,13 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANT_STYLES: Record<Variant, string> = {
   primary:
-    "bg-surface-brand text-text-inverse hover:bg-primary-600 active:bg-primary-700 focus-visible:bg-primary-600 disabled:bg-surface-sunken disabled:text-text-tertiary",
+    "bg-surface-brand text-white font-semibold hover:bg-primary-600 active:bg-primary-700 focus-visible:bg-primary-600 disabled:bg-surface-sunken disabled:text-text-tertiary",
   secondary:
-    "bg-surface-canvas text-text-primary border border-border-default hover:bg-surface-raised active:bg-surface-sunken focus-visible:border-border-focus",
+    "bg-surface-canvas text-text-primary font-medium border border-border-default hover:bg-surface-raised active:bg-surface-sunken focus-visible:border-border-focus",
   ghost:
-    "bg-transparent text-text-primary hover:bg-surface-sunken active:bg-surface-raised",
+    "bg-transparent text-text-primary font-medium hover:bg-surface-sunken active:bg-surface-raised",
   danger:
-    "bg-sindoor-500 text-text-inverse hover:bg-sindoor-600 active:bg-sindoor-700",
+    "bg-sindoor-500 text-white font-semibold hover:bg-sindoor-600 active:bg-sindoor-700",
 };
 
 const SIZE_STYLES: Record<Size, string> = {
@@ -50,7 +50,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          "inline-flex items-center justify-center font-medium transition-colors",
+          "inline-flex items-center justify-center transition-colors",
           "disabled:cursor-not-allowed",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus",
           VARIANT_STYLES[variant],

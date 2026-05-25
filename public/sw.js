@@ -9,7 +9,7 @@
  * a no-op fetch handler is enough to qualify as installable.
  */
 
-const CACHE_VERSION = "saral-v1";
+const CACHE_VERSION = "saral-v2";
 const SHELL = ["/", "/staff/queue"];
 
 self.addEventListener("install", (event) => {
