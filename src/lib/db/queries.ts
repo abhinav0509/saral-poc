@@ -73,17 +73,21 @@ export async function getVisitsBetween(
 /**
  * All past visits for a patient, identified by mobile number.
  * Used by the Patient History viewer.
+ *
+ * Matches by the last 10 digits so it works whether mobile is stored
+ * as "+919876543210", "919876543210", or "9876543210".
  */
 export async function getPatientHistoryByMobile(
   mobile: string,
   clinicId: string,
 ): Promise<Visit[]> {
-  const cleaned = mobile.replace(/\D/g, "");
+  const last10 = mobile.replace(/\D/g, "").slice(-10);
+  if (last10.length < 10) return [];
   const { data, error } = await getSupabase()
     .from("visits")
     .select("*")
     .eq("clinic_id", clinicId)
-    .eq("mobile", cleaned)
+    .like("mobile", `%${last10}`)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data as Visit[] | null) ?? [];

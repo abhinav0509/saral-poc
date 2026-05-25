@@ -211,8 +211,9 @@ function VisitRow({ visit }: { visit: Visit }) {
 
 function formatMobile(m: string): string {
   const cleaned = m.replace(/\D/g, "");
-  if (cleaned.length === 10) {
-    return `${cleaned.slice(0, 5)} ${cleaned.slice(5)}`;
+  const last10 = cleaned.slice(-10);
+  if (last10.length === 10) {
+    return `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`;
   }
   return cleaned;
 }
