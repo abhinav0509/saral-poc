@@ -67,7 +67,7 @@ export function NewBookingClient({ clinicId, clinicName }: NewBookingClientProps
           patientName: name.trim(),
           age: parseInt(age, 10),
           gender,
-          mobile: mobile.replace(/\D/g, ""),
+          mobile: mobile.replace(/\D/g, "").slice(-10),
           source,
           reason: reason.trim() || null,
         });
@@ -198,11 +198,13 @@ export function NewBookingClient({ clinicId, clinicName }: NewBookingClientProps
         <Input
           label="Mobile number"
           name="mobile"
-          leading={<span className="text-label-md font-semibold">+91</span>}
           inputMode="tel"
-          placeholder="98xxx xxx12"
+          placeholder="10-digit mobile"
           value={mobile}
-          onChange={(e) => setMobile(e.target.value)}
+          onChange={(e) =>
+            setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
+          }
+          maxLength={10}
         />
 
         <Input

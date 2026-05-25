@@ -65,7 +65,11 @@ export function PatientHistoryClient({ visits }: PatientHistoryClientProps) {
             </p>
           </div>
           <a
-            href={patient.mobile ? `tel:+91${patient.mobile}` : "#"}
+            href={
+              patient.mobile
+                ? `tel:${patient.mobile.replace(/\D/g, "").slice(-10)}`
+                : "#"
+            }
             aria-label="Call"
             className="size-10 rounded-full bg-surface-canvas border border-border-default flex items-center justify-center text-text-brand transition-colors hover:bg-surface-sunken"
           >
@@ -213,7 +217,7 @@ function formatMobile(m: string): string {
   const cleaned = m.replace(/\D/g, "");
   const last10 = cleaned.slice(-10);
   if (last10.length === 10) {
-    return `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`;
+    return `${last10.slice(0, 5)} ${last10.slice(5)}`;
   }
   return cleaned;
 }

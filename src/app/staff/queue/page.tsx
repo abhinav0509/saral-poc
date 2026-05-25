@@ -556,7 +556,7 @@ function QueueRow({
   const [menuOpen, setMenuOpen] = useState(false);
 
   const dialerHref = visit.mobile
-    ? `tel:+91${visit.mobile.replace(/^\+?91/, "").replace(/\D/g, "")}`
+    ? `tel:${visit.mobile.replace(/\D/g, "").slice(-10)}`
     : null;
 
   return (
@@ -845,7 +845,7 @@ function DropConfirmSheet({
         </p>
         <div className="mt-5 flex flex-col gap-2">
           <a
-            href={visit.mobile ? `tel:+91${visit.mobile.replace(/^\+?91/, "")}` : "#"}
+            href={visit.mobile ? `tel:${visit.mobile.replace(/\D/g, "").slice(-10)}` : "#"}
             className={cn(
               "h-12 inline-flex items-center justify-center gap-2 rounded-xl",
               "bg-surface-brand text-white text-label-lg font-semibold",
