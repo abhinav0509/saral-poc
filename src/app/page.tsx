@@ -30,7 +30,7 @@ export default function HomePage() {
         </p>
 
         <Link
-          href="/staff"
+          href="/staff?role=receptionist"
           className="group"
           aria-label="Open clinic staff view"
         >
@@ -59,7 +59,7 @@ export default function HomePage() {
         </Link>
 
         <Link
-          href="/staff"
+          href="/staff?role=doctor"
           className="group"
           aria-label="Open clinic doctor view"
         >

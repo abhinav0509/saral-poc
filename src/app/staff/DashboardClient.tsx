@@ -39,6 +39,26 @@ export function DashboardClient({
   } | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [role, setRole] = useState<"receptionist" | "doctor">("receptionist");
+
+  // On mount: prefer URL ?role= (just came from splash), else localStorage,
+  // else default to receptionist. Persists so deep links back to /staff
+  // remember who the user is without the param re-appearing.
+  useEffect(() => {
+    const urlRole = new URLSearchParams(window.location.search).get("role");
+    if (urlRole === "doctor" || urlRole === "receptionist") {
+      window.localStorage.setItem("saral.role", urlRole);
+      setRole(urlRole);
+      // Strip the param so refreshes don't re-trigger anything
+      window.history.replaceState({}, "", "/staff");
+      return;
+    }
+    const stored = window.localStorage.getItem("saral.role");
+    if (stored === "doctor" || stored === "receptionist") setRole(stored);
+  }, []);
+
+  const displayName = role === "doctor" ? "Dr. Bhatura" : "Phoolwati";
+  const avatarInitial = role === "doctor" ? "D" : "P";
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -130,15 +150,15 @@ export function DashboardClient({
         <div className="flex-1 min-w-0">
           <p className="text-body-sm text-text-secondary">{greeting},</p>
           <h1 className="text-h2 font-bold text-text-primary leading-tight tracking-tight">
-            Phoolwati
+            {displayName}
           </h1>
         </div>
         <Link
           href="/"
-          aria-label="Account"
+          aria-label="Switch role"
           className="size-10 rounded-full bg-surface-sunken border border-border-subtle flex items-center justify-center text-label-md font-semibold text-text-primary"
         >
-          P
+          {avatarInitial}
         </Link>
       </header>
 
@@ -276,6 +296,7 @@ export function DashboardClient({
             <QuickAction
               label="Emergency"
               icon={<HeartPulse size={22} strokeWidth={2.2} />}
+              tone="critical"
               onClick={() => setEmergencyOpen(true)}
             />
           </div>
@@ -509,15 +530,30 @@ function QuickAction({
   icon,
   href,
   onClick,
+  tone = "brand",
 }: {
   label: string;
   icon: React.ReactNode;
   href?: string;
   onClick?: () => void;
+  tone?: "brand" | "critical";
 }) {
+  // Both tones share the same outer card; only the icon-circle bg + icon
+  // color change, so Emergency is unmistakably red while the row stays
+  // visually balanced with the brand-teal siblings.
+  const iconCircle =
+    tone === "critical"
+      ? "bg-sindoor-50 text-text-critical"
+      : "bg-surface-canvas text-text-brand";
+
   const inner = (
     <>
-      <span className="size-12 rounded-full bg-surface-canvas flex items-center justify-center text-text-brand shadow-sm">
+      <span
+        className={cn(
+          "size-12 rounded-full flex items-center justify-center shadow-sm",
+          iconCircle,
+        )}
+      >
         {icon}
       </span>
       <span className="text-label-md font-semibold text-text-primary">
