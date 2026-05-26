@@ -12,7 +12,9 @@ import {
   X,
   UserPlus,
   BellRing,
+  Share2,
 } from "lucide-react";
+import { ShareLinkSheet } from "@/components/share/ShareLinkSheet";
 import { Card } from "@/components/ui/Card";
 import { StaffBottomNav } from "@/components/staff/StaffBottomNav";
 import { Toast } from "@/components/ui/Toast";
@@ -41,7 +43,14 @@ export function DashboardClient({
   } | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
   const [role, setRole] = useState<"receptionist" | "doctor">("receptionist");
+
+  // Build the self-check-in URL once we're on the client
+  useEffect(() => {
+    setShareUrl(`${window.location.origin}/walkin/${clinic.code}`);
+  }, [clinic.code]);
 
   // On mount: prefer URL ?role= (just came from splash), else localStorage,
   // else default to receptionist. Persists so deep links back to /staff
@@ -155,6 +164,15 @@ export function DashboardClient({
             {displayName}
           </h1>
         </div>
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          aria-label="Share self-check-in link"
+          className="inline-flex items-center gap-1.5 h-9 px-3 mt-1 rounded-full text-label-sm font-semibold text-text-brand hover:bg-surface-sunken transition-colors"
+        >
+          <Share2 size={16} />
+          Share link
+        </button>
         <Link
           href="/"
           aria-label="Switch role"
@@ -310,6 +328,14 @@ export function DashboardClient({
 
       {emergencyOpen && (
         <EmergencySheet onClose={() => setEmergencyOpen(false)} />
+      )}
+
+      {shareOpen && (
+        <ShareLinkSheet
+          url={shareUrl}
+          clinicName={clinic.name}
+          onClose={() => setShareOpen(false)}
+        />
       )}
     </main>
   );

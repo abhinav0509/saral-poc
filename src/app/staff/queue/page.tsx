@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
 import { DelaySheet } from "./DelaySheet";
+import { ShareLinkSheet } from "@/components/share/ShareLinkSheet";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { Card } from "@/components/ui/Card";
 import { SourceBadge } from "@/components/ui/SourceBadge";
@@ -53,6 +54,7 @@ export default function StaffQueuePage() {
   } | null>(null);
   const [dropConfirm, setDropConfirm] = useState<Visit | null>(null);
   const [delayOpen, setDelayOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [pending, startPending] = useTransition();
   const [tab, setTab] = useState<TabKey>("waiting");
   const [search, setSearch] = useState("");
@@ -317,6 +319,15 @@ export default function StaffQueuePage() {
           Walk-in
         </Link>
 
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          aria-label="Share self-check-in link"
+          className="size-9 mr-1 inline-flex items-center justify-center rounded-full text-text-brand hover:bg-surface-sunken transition-colors"
+        >
+          <Share2 size={18} />
+        </button>
+
         <Link
           href="/"
           aria-label="Account"
@@ -556,6 +567,18 @@ export default function StaffQueuePage() {
               desc: "All waiting patients pushed back.",
             });
           }}
+        />
+      )}
+
+      {shareOpen && clinic && (
+        <ShareLinkSheet
+          url={
+            typeof window !== "undefined"
+              ? `${window.location.origin}/walkin/${clinic.code}`
+              : ""
+          }
+          clinicName={clinic.name}
+          onClose={() => setShareOpen(false)}
         />
       )}
     </main>
