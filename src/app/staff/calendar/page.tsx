@@ -4,6 +4,7 @@ import {
   getVisitsBetween,
   getBlocksBetween,
 } from "@/lib/db/queries";
+import type { ClinicBlock } from "@/lib/db/types";
 import { CalendarClient } from "./CalendarClient";
 
 const CLINIC_CODE = "drmehta";
@@ -24,7 +25,7 @@ export default async function CalendarPage() {
 
   const visits = await getVisitsBetween(clinic.id, monday, sundayEnd);
   // Blocks table is optional — page must render even if migration hasn't run
-  let blocks;
+  let blocks: ClinicBlock[] = [];
   try {
     blocks = await getBlocksBetween(
       clinic.id,
@@ -32,8 +33,10 @@ export default async function CalendarPage() {
       sundayEnd.toISOString(),
     );
   } catch (e) {
-    console.warn("[calendar] clinic_blocks unavailable — run supabase/migrations/0002_clinic_blocks.sql", e);
-    blocks = [];
+    console.warn(
+      "[calendar] clinic_blocks unavailable — run supabase/migrations/0002_clinic_blocks.sql",
+      e,
+    );
   }
 
   return (
