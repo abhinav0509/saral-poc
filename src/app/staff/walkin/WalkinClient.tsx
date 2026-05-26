@@ -2,9 +2,15 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Copy, Check, ArrowRight, QrCode } from "lucide-react";
+import {
+  ChevronLeft,
+  Copy,
+  Check,
+  ArrowRight,
+  Share2,
+  X,
+} from "lucide-react";
 import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
@@ -24,8 +30,8 @@ type Gender = "Female" | "Male" | "Other";
 export function WalkinClient({ clinic }: { clinic: Clinic }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [copied, setCopied] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
 
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
@@ -48,23 +54,6 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
   useEffect(() => {
     setShareUrl(`${window.location.origin}/walkin/${clinic.code}`);
   }, [clinic.code]);
-
-  function handleCopy() {
-    if (!shareUrl) return;
-    void navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  }
-
-  function handleWhatsapp() {
-    if (!shareUrl) return;
-    const msg = `Hi! Self-check into ${clinic.name} here — fast, no app needed, you get a live token: ${shareUrl}`;
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(msg)}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
-  }
 
   function validate(): string | null {
     if (name.trim().length < 2) return "Please enter the patient's name";
@@ -98,7 +87,7 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
           age: parseInt(age, 10),
           gender,
           mobile: mobile.replace(/\D/g, "").slice(-10),
-          source: "qr", // still a walk-in for metrics & queue origin
+          source: "qr",
           reason: reason.trim() || null,
           bookedFor,
         });
@@ -124,7 +113,8 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas pb-32">
+    <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas">
+      {/* ─── HEADER ─── */}
       <header className="flex items-center px-3 h-14 border-b border-border-subtle sticky top-0 bg-surface-canvas z-20">
         <button
           onClick={() => router.back()}
@@ -136,93 +126,44 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
         <h1 className="flex-1 text-label-lg font-semibold text-text-primary">
           Add walk-in
         </h1>
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          aria-label="Share self-check-in link"
+          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-label-sm font-semibold text-text-brand hover:bg-surface-sunken transition-colors"
+        >
+          <Share2 size={16} />
+          Share link
+        </button>
       </header>
 
-      <div className="flex-1 flex flex-col px-4 py-5 gap-5">
-        {/* Share self-check-in link */}
-        <Card surface="raised" bordered className="p-4 flex flex-col gap-3">
-          <div className="flex items-start gap-3">
-            <span className="size-10 rounded-lg bg-surface-brand-subtle text-text-brand flex items-center justify-center flex-none">
-              <QrCode size={18} />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-label-lg font-semibold text-text-primary">
-                Share self-check-in link
-              </p>
-              <p className="text-caption text-text-secondary mt-0.5 leading-snug">
-                Skip the typing — let the patient fill it on their phone.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 bg-surface-canvas border border-border-default rounded-lg px-3 py-2">
-            <span className="text-body-sm text-text-primary truncate flex-1 min-w-0 tnum">
-              {shareUrl
-                ? shareUrl.replace(/^https?:\/\//, "")
-                : `loading…/${clinic.code}`}
-            </span>
-            <button
-              onClick={handleCopy}
-              aria-label="Copy link"
-              disabled={!shareUrl}
-              className={cn(
-                "size-8 inline-flex items-center justify-center rounded-md flex-none transition-colors",
-                copied
-                  ? "bg-sage-100 text-text-success"
-                  : "bg-surface-sunken text-text-secondary hover:bg-surface-raised",
-                !shareUrl && "opacity-50",
-              )}
-            >
-              {copied ? <Check size={16} /> : <Copy size={15} />}
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleWhatsapp}
-            disabled={!shareUrl}
-            className={cn(
-              "inline-flex items-center justify-center gap-2 h-11 px-4 rounded-lg",
-              "bg-surface-brand text-white text-label-md font-semibold",
-              "transition-transform active:scale-[0.98]",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
-            )}
-          >
-            <WhatsAppIcon size={18} />
-            Send link on WhatsApp
-          </button>
-        </Card>
-
-        {/* OR divider */}
-        <div className="flex items-center gap-3 py-1">
-          <span className="flex-1 h-px bg-border-subtle" />
-          <span className="text-caption text-text-tertiary uppercase tracking-wider font-medium">
-            Or fill it in for them
-          </span>
-          <span className="flex-1 h-px bg-border-subtle" />
-        </div>
-
-        <Card surface="raised" className="p-3">
-          <p className="text-caption text-text-secondary leading-snug">
-            For elderly patients, kids, or anyone not comfortable with their
-            phone. We&apos;ll auto-pick the next free slot — change it below if
-            they want to come later.
-          </p>
-        </Card>
+      <form
+        onSubmit={handleSubmit}
+        className="flex-1 flex flex-col px-4 pt-6 pb-44"
+      >
+        {/* Single-line intro — no card, no tip */}
+        <p className="text-body-sm text-text-secondary px-1 mb-6 leading-snug">
+          Fill the patient&apos;s details and pick a time. We auto-pick the
+          next free slot.
+        </p>
 
         {toast && (
-          <Toast
-            tone={toast.tone}
-            title={toast.title}
-            description={toast.desc}
-            autoHide={4500}
-            onDismiss={() => setToast(null)}
-          />
+          <div className="mb-4">
+            <Toast
+              tone={toast.tone}
+              title={toast.title}
+              description={toast.desc}
+              autoHide={4500}
+              onDismiss={() => setToast(null)}
+            />
+          </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        {/* ─── SECTION 1 · PATIENT ─── */}
+        <SectionHeading>Patient</SectionHeading>
+        <div className="flex flex-col gap-5">
           <Input
-            label="Patient name"
+            label="Full name"
             placeholder="e.g. Riya Sharma"
             autoComplete="name"
             value={name}
@@ -280,18 +221,22 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
               setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
             }
             maxLength={10}
-            helperText="Their queue link will go here on WhatsApp."
+            helperText="Their queue link goes here on WhatsApp."
             name="mobile"
           />
 
           <Input
-            label="Reason (optional)"
-            placeholder="Fever, body ache…"
+            label="Reason"
+            placeholder="Fever, body ache… (optional)"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             name="reason"
           />
+        </div>
 
+        {/* ─── SECTION 2 · TIME ─── */}
+        <div className="mt-10">
+          <SectionHeading>Time</SectionHeading>
           <SlotPicker
             ref={pickerRef}
             clinicId={clinic.id}
@@ -304,11 +249,11 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
             conflictHint={conflictHint}
             onNotice={(n) => setToast({ tone: "info", ...n })}
           />
-        </form>
-      </div>
+        </div>
+      </form>
 
-      {/* Sticky bottom — confirm */}
-      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-5 z-20">
+      {/* ─── STICKY CONFIRM ─── */}
+      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] z-20">
         {slot && (
           <p className="text-caption text-text-secondary mb-2 px-1">
             Walk-in slot:{" "}
@@ -341,6 +286,135 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
               : "Pick a slot to continue"}
         </Button>
       </div>
+
+      {shareOpen && (
+        <ShareLinkSheet
+          url={shareUrl}
+          clinicName={clinic.name}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </main>
+  );
+}
+
+/* ============================================================
+   Section heading — quiet hierarchy, no card weight
+   ============================================================ */
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 mb-4 px-1">
+      <span className="text-label-sm font-semibold uppercase tracking-wider text-text-tertiary">
+        {children}
+      </span>
+      <span className="flex-1 h-px bg-border-subtle" />
+    </div>
+  );
+}
+
+/* ============================================================
+   Share link sheet — opens from header action
+   ============================================================ */
+
+function ShareLinkSheet({
+  url,
+  clinicName,
+  onClose,
+}: {
+  url: string;
+  clinicName: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    if (!url) return;
+    void navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
+
+  function handleWhatsapp() {
+    if (!url) return;
+    const msg = `Hi! Self-check into ${clinicName} here — fast, no app needed, you get a live token: ${url}`;
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(msg)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <button
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 bg-surface-inverse/55 animate-in fade-in duration-200"
+      />
+      <div
+        className={cn(
+          "relative w-full max-w-md bg-surface-canvas rounded-t-3xl px-5 pt-3 pb-8 shadow-lg",
+          "animate-in slide-in-from-bottom duration-300 ease-out",
+        )}
+        role="dialog"
+      >
+        <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-border-default" />
+
+        <div className="flex items-start gap-3 mb-1">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-h3 font-bold text-text-primary leading-tight">
+              Share self-check-in
+            </h2>
+            <p className="text-body-sm text-text-secondary mt-1 leading-snug">
+              Patient fills the form on their own phone and gets a live token.
+            </p>
+          </div>
+          <button
+            aria-label="Close"
+            onClick={onClose}
+            className="size-9 -mt-1 -mr-1 flex items-center justify-center rounded-full hover:bg-surface-sunken"
+          >
+            <X size={18} className="text-text-secondary" />
+          </button>
+        </div>
+
+        <div className="mt-5 flex items-center gap-2 bg-surface-raised border border-border-default rounded-lg px-3 py-2.5">
+          <span className="text-body-sm text-text-primary truncate flex-1 min-w-0 tnum">
+            {url ? url.replace(/^https?:\/\//, "") : "loading…"}
+          </span>
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label="Copy link"
+            disabled={!url}
+            className={cn(
+              "h-9 px-3 inline-flex items-center gap-1.5 rounded-md flex-none text-label-sm font-semibold transition-colors",
+              copied
+                ? "bg-sage-100 text-text-success"
+                : "bg-surface-canvas border border-border-default text-text-secondary hover:bg-surface-sunken",
+            )}
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleWhatsapp}
+          disabled={!url}
+          className={cn(
+            "mt-3 w-full h-12 inline-flex items-center justify-center gap-2 rounded-xl",
+            "bg-surface-brand text-white text-label-lg font-semibold",
+            "transition-transform active:scale-[0.98]",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+          )}
+        >
+          <WhatsAppIcon size={18} />
+          Send on WhatsApp
+        </button>
+      </div>
+    </div>
   );
 }

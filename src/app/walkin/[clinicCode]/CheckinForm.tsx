@@ -4,7 +4,6 @@ import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Toast } from "@/components/ui/Toast";
 import {
@@ -107,115 +106,122 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex-1 flex flex-col px-4 py-5 gap-5 pb-32"
+      className="flex-1 flex flex-col px-4 pt-6 pb-44"
     >
-      {/* Welcome banner */}
-      <Card surface="raised" className="p-4">
-        <p className="text-h3 font-bold text-text-primary leading-tight">
-          Welcome
-        </p>
-        <p className="mt-1 text-body-sm text-text-secondary leading-snug">
-          A few quick details and your slot — you&apos;ll get a token with your
-          expected time.
-        </p>
-      </Card>
+      {/* Quiet welcome — no card weight */}
+      <h2 className="text-h2 font-bold text-text-primary leading-tight tracking-tight px-1">
+        Welcome
+      </h2>
+      <p className="text-body-sm text-text-secondary mt-1 px-1 leading-snug">
+        A few quick details and we&apos;ll send you a live queue link.
+      </p>
 
       {toast && (
-        <Toast
-          tone={toast.tone}
-          title={toast.title}
-          description={toast.desc}
-          autoHide={4500}
-          onDismiss={() => setToast(null)}
-        />
-      )}
-
-      <Input
-        label="Patient name"
-        placeholder="e.g. Riya Sharma"
-        autoComplete="name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        name="name"
-      />
-
-      <div className="flex gap-3">
-        <div className="w-24">
-          <Input
-            label="Age"
-            inputMode="numeric"
-            placeholder="34"
-            value={age}
-            onChange={(e) => setAge(e.target.value.replace(/\D/g, ""))}
-            name="age"
-            className="text-center"
+        <div className="mt-5">
+          <Toast
+            tone={toast.tone}
+            title={toast.title}
+            description={toast.desc}
+            autoHide={4500}
+            onDismiss={() => setToast(null)}
           />
         </div>
-        <div className="flex-1 flex flex-col gap-1.5">
-          <label className="text-label-md font-medium text-text-secondary">
-            Gender
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            {(["Female", "Male", "Other"] as Gender[]).map((g) => {
-              const active = gender === g;
-              return (
-                <button
-                  type="button"
-                  key={g}
-                  onClick={() => setGender(g)}
-                  className={cn(
-                    "h-12 rounded-xl border text-label-md font-medium transition-colors",
-                    active
-                      ? "bg-surface-inverse text-text-inverse border-transparent"
-                      : "bg-surface-canvas text-text-primary border-border-default hover:bg-surface-raised",
-                  )}
-                  aria-pressed={active}
-                >
-                  {g}
-                </button>
-              );
-            })}
+      )}
+
+      {/* ─── YOU ─── */}
+      <SectionHeading>About you</SectionHeading>
+      <div className="flex flex-col gap-5">
+        <Input
+          label="Full name"
+          placeholder="e.g. Riya Sharma"
+          autoComplete="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          name="name"
+        />
+
+        <div className="flex gap-3">
+          <div className="w-24">
+            <Input
+              label="Age"
+              inputMode="numeric"
+              placeholder="34"
+              value={age}
+              onChange={(e) => setAge(e.target.value.replace(/\D/g, ""))}
+              name="age"
+              className="text-center"
+            />
+          </div>
+          <div className="flex-1 flex flex-col gap-1.5">
+            <label className="text-label-md font-medium text-text-secondary">
+              Gender
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["Female", "Male", "Other"] as Gender[]).map((g) => {
+                const active = gender === g;
+                return (
+                  <button
+                    type="button"
+                    key={g}
+                    onClick={() => setGender(g)}
+                    className={cn(
+                      "h-12 rounded-xl border text-label-md font-medium transition-colors",
+                      active
+                        ? "bg-surface-inverse text-text-inverse border-transparent"
+                        : "bg-surface-canvas text-text-primary border-border-default hover:bg-surface-raised",
+                    )}
+                    aria-pressed={active}
+                  >
+                    {g}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
+
+        <Input
+          label="Mobile number"
+          inputMode="tel"
+          placeholder="10-digit mobile"
+          autoComplete="tel-national"
+          value={mobile}
+          onChange={(e) =>
+            setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
+          }
+          maxLength={10}
+          helperText="We'll send your queue link here."
+          name="mobile"
+        />
+
+        <Input
+          label="Reason"
+          placeholder="Fever, body ache… (optional)"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          name="reason"
+        />
       </div>
 
-      <Input
-        label="Mobile number"
-        inputMode="tel"
-        placeholder="10-digit mobile"
-        autoComplete="tel-national"
-        value={mobile}
-        onChange={(e) =>
-          setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
-        }
-        maxLength={10}
-        helperText="We'll send your queue link here."
-        name="mobile"
-      />
+      {/* ─── TIME ─── */}
+      <div className="mt-10">
+        <SectionHeading>Choose a time</SectionHeading>
+        <SlotPicker
+          ref={pickerRef}
+          clinicId={clinicId}
+          selected={slot}
+          onChange={(s) => {
+            setSlot(s);
+            setConflictHint(null);
+          }}
+          autoSelectNextFree
+          conflictHint={conflictHint}
+          onNotice={(n) => setToast({ tone: "info", ...n })}
+        />
+      </div>
 
-      <Input
-        label="What brings you in? (optional)"
-        placeholder="Fever, body ache…"
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        name="reason"
-      />
-
-      {/* Slot picker — same component the staff sees */}
-      <SlotPicker
-        ref={pickerRef}
-        clinicId={clinicId}
-        selected={slot}
-        onChange={(s) => {
-          setSlot(s);
-          setConflictHint(null);
-        }}
-        autoSelectNextFree
-        conflictHint={conflictHint}
-        onNotice={(n) => setToast({ tone: "info", ...n })}
-      />
-
-      <label className="flex items-start gap-3 cursor-pointer select-none">
+      {/* ─── CONSENT ─── */}
+      <label className="mt-8 flex items-start gap-3 cursor-pointer select-none">
         <span
           className={cn(
             "size-5 mt-0.5 rounded-md flex-none flex items-center justify-center transition-colors",
@@ -238,8 +244,12 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
         </span>
       </label>
 
+      <p className="mt-6 text-caption text-text-tertiary text-center">
+        Powered by Saral · Your details are private
+      </p>
+
       {/* Sticky bottom CTA */}
-      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-5 z-20">
+      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] z-20">
         {slot && (
           <p className="text-caption text-text-secondary mb-2 px-1">
             Your slot:{" "}
@@ -271,10 +281,17 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
               : "Pick a slot to continue"}
         </Button>
       </div>
-
-      <p className="mt-auto text-caption text-text-tertiary text-center">
-        Powered by Saral · Your details are private
-      </p>
     </form>
+  );
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 mt-8 mb-4 px-1">
+      <span className="text-label-sm font-semibold uppercase tracking-wider text-text-tertiary">
+        {children}
+      </span>
+      <span className="flex-1 h-px bg-border-subtle" />
+    </div>
   );
 }
