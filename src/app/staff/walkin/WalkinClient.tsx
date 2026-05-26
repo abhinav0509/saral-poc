@@ -1,20 +1,21 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ChevronLeft,
-  Copy,
-  Check,
-  ArrowRight,
-  QrCode,
-} from "lucide-react";
+import { ChevronLeft, Copy, Check, ArrowRight, QrCode } from "lucide-react";
 import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
-import { createVisit } from "@/lib/db/queries";
+import {
+  SlotPicker,
+  combineDateTime,
+  formatSlotTime,
+  type SlotPickerHandle,
+  type SlotSelection,
+} from "@/components/booking/SlotPicker";
+import { createBooking, SlotConflictError } from "@/lib/db/queries";
 import type { Clinic } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +32,18 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
   const [gender, setGender] = useState<Gender | null>(null);
   const [mobile, setMobile] = useState("");
   const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [slot, setSlot] = useState<SlotSelection | null>(null);
+  const [conflictHint, setConflictHint] = useState<{ time: string } | null>(
+    null,
+  );
+
+  const pickerRef = useRef<SlotPickerHandle>(null);
+
+  const [toast, setToast] = useState<{
+    tone: "error" | "info" | "success";
+    title: string;
+    desc?: string;
+  } | null>(null);
 
   useEffect(() => {
     setShareUrl(`${window.location.origin}/walkin/${clinic.code}`);
@@ -62,41 +74,58 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
     if (!gender) return "Please pick a gender";
     const cleanedMobile = mobile.replace(/\D/g, "");
     if (cleanedMobile.length < 10) return "Please enter a 10-digit mobile";
+    if (!slot) return "Pick a time slot for this walk-in";
     return null;
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     const msg = validate();
     if (msg) {
-      setError(msg);
+      setToast({ tone: "error", title: "Hold on", desc: msg });
       return;
     }
-    setError(null);
 
     startTransition(async () => {
       try {
-        const visit = await createVisit({
+        const bookedFor = combineDateTime(
+          slot!.dateIso,
+          slot!.time,
+        ).toISOString();
+        const visit = await createBooking({
           clinicId: clinic.id,
           patientName: name.trim(),
           age: parseInt(age, 10),
           gender,
           mobile: mobile.replace(/\D/g, "").slice(-10),
-          source: "qr",
+          source: "qr", // still a walk-in for metrics & queue origin
           reason: reason.trim() || null,
+          bookedFor,
         });
         router.push(`/staff/queue?added=${encodeURIComponent(visit.token)}`);
       } catch (err: unknown) {
+        if (err instanceof SlotConflictError) {
+          const takenTime = slot!.time;
+          setSlot(null);
+          setConflictHint({ time: takenTime });
+          await pickerRef.current?.refresh();
+          setToast({
+            tone: "error",
+            title: "Just taken",
+            desc: "Pick one of the suggested alternates below.",
+          });
+          return;
+        }
         const m =
           err instanceof Error ? err.message : "Couldn't add this patient";
-        setError(m);
+        setToast({ tone: "error", title: "Couldn't save", desc: m });
       }
     });
   }
 
   return (
-    <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas pb-10">
-      <header className="flex items-center px-3 h-14 border-b border-border-subtle sticky top-0 bg-surface-canvas z-10">
+    <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas pb-32">
+      <header className="flex items-center px-3 h-14 border-b border-border-subtle sticky top-0 bg-surface-canvas z-20">
         <button
           onClick={() => router.back()}
           aria-label="Back"
@@ -109,7 +138,7 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
         </h1>
       </header>
 
-      <div className="flex-1 flex flex-col px-5 py-5 gap-5">
+      <div className="flex-1 flex flex-col px-4 py-5 gap-5">
         {/* Share self-check-in link */}
         <Card surface="raised" bordered className="p-4 flex flex-col gap-3">
           <div className="flex items-start gap-3">
@@ -173,14 +202,24 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
           <span className="flex-1 h-px bg-border-subtle" />
         </div>
 
-        <Card surface="raised" className="p-3 -mx-1">
-          <p className="text-caption text-text-secondary leading-snug px-1">
-            Use this for elderly patients, kids, or anyone not comfortable with
-            their phone. Adds them straight to the queue.
+        <Card surface="raised" className="p-3">
+          <p className="text-caption text-text-secondary leading-snug">
+            For elderly patients, kids, or anyone not comfortable with their
+            phone. We&apos;ll auto-pick the next free slot — change it below if
+            they want to come later.
           </p>
         </Card>
 
-        {/* Manual form */}
+        {toast && (
+          <Toast
+            tone={toast.tone}
+            title={toast.title}
+            description={toast.desc}
+            autoHide={4500}
+            onDismiss={() => setToast(null)}
+          />
+        )}
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <Input
             label="Patient name"
@@ -217,7 +256,6 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
                       onClick={() => setGender(g)}
                       className={cn(
                         "h-12 rounded-xl border text-label-md font-medium transition-colors",
-                        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus",
                         active
                           ? "bg-surface-inverse text-text-inverse border-transparent"
                           : "bg-surface-canvas text-text-primary border-border-default hover:bg-surface-raised",
@@ -254,25 +292,54 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
             name="reason"
           />
 
-          {error && (
-            <Toast
-              tone="error"
-              title="Hold on"
-              description={error}
-              onDismiss={() => setError(null)}
-            />
-          )}
-
-          <Button
-            type="submit"
-            size="lg"
-            block
-            disabled={pending}
-            trailingIcon={!pending ? <ArrowRight size={18} /> : undefined}
-          >
-            {pending ? "Adding…" : "Add to queue"}
-          </Button>
+          <SlotPicker
+            ref={pickerRef}
+            clinicId={clinic.id}
+            selected={slot}
+            onChange={(s) => {
+              setSlot(s);
+              setConflictHint(null);
+            }}
+            autoSelectNextFree
+            conflictHint={conflictHint}
+            onNotice={(n) => setToast({ tone: "info", ...n })}
+          />
         </form>
+      </div>
+
+      {/* Sticky bottom — confirm */}
+      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-5 z-20">
+        {slot && (
+          <p className="text-caption text-text-secondary mb-2 px-1">
+            Walk-in slot:{" "}
+            <span className="font-semibold text-text-primary">
+              {new Date(`${slot.dateIso}T00:00:00`).toLocaleDateString(
+                "en-IN",
+                {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                },
+              )}{" "}
+              · {formatSlotTime(slot.time)}
+            </span>
+          </p>
+        )}
+        <Button
+          type="button"
+          variant="primary"
+          size="lg"
+          block
+          disabled={pending || !slot}
+          trailingIcon={!pending && slot ? <ArrowRight size={18} /> : undefined}
+          onClick={() => handleSubmit()}
+        >
+          {pending
+            ? "Adding…"
+            : slot
+              ? "Add to queue"
+              : "Pick a slot to continue"}
+        </Button>
       </div>
     </main>
   );
