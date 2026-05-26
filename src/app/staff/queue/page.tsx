@@ -12,8 +12,8 @@ import {
   Share2,
   CheckCircle2,
   ChevronRight,
-  MessageSquare,
 } from "lucide-react";
+import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { Card } from "@/components/ui/Card";
 import { SourceBadge } from "@/components/ui/SourceBadge";
@@ -664,7 +664,7 @@ function QueueRow({
                   className="w-full flex items-center gap-3 px-3 py-3 text-label-md text-text-primary hover:bg-surface-sunken transition-colors text-left border-t border-border-subtle"
                   role="menuitem"
                 >
-                  <MessageSquare size={16} className="text-text-success" />
+                  <WhatsAppIcon size={16} className="text-[#25D366]" />
                   Send link on WhatsApp
                 </button>
                 <button

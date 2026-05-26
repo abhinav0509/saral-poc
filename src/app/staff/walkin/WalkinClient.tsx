@@ -6,10 +6,10 @@ import {
   ChevronLeft,
   Copy,
   Check,
-  MessageSquare,
   ArrowRight,
   QrCode,
 } from "lucide-react";
+import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -153,13 +153,13 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
             onClick={handleWhatsapp}
             disabled={!shareUrl}
             className={cn(
-              "inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg",
-              "bg-sage-50 text-text-success text-label-md font-semibold",
-              "transition-colors hover:bg-sage-100",
+              "inline-flex items-center justify-center gap-2 h-11 px-4 rounded-lg",
+              "bg-[#25D366] text-white text-label-md font-semibold shadow-sm",
+              "transition-transform active:scale-[0.98]",
               "disabled:opacity-50 disabled:cursor-not-allowed",
             )}
           >
-            <MessageSquare size={16} />
+            <WhatsAppIcon size={18} />
             Send link on WhatsApp
           </button>
         </Card>

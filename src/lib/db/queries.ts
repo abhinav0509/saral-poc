@@ -319,6 +319,83 @@ interface CreateVisitInput {
   mobile: string | null;
   source: VisitSource;
   reason?: string | null;
+  bookedFor?: string | null;
+}
+
+/**
+ * All visits booked for a specific calendar day at this clinic, regardless
+ * of status. Used by the booking flow to render slot availability.
+ */
+export async function getBookingsForDate(
+  clinicId: string,
+  isoDate: string, // e.g. "2026-05-27"
+): Promise<Visit[]> {
+  const startOfDay = new Date(`${isoDate}T00:00:00`);
+  const endOfDay = new Date(`${isoDate}T23:59:59.999`);
+  const { data, error } = await getSupabase()
+    .from("visits")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .gte("booked_for", startOfDay.toISOString())
+    .lte("booked_for", endOfDay.toISOString())
+    .not("booked_for", "is", null)
+    .neq("status", "dropped")
+    .order("booked_for", { ascending: true });
+  if (error) throw error;
+  return (data as Visit[] | null) ?? [];
+}
+
+/**
+ * Booking-specific create. Atomically checks the slot is still free
+ * before inserting — if a concurrent booking landed on the same slot
+ * a few ms earlier, this throws SlotConflictError so the UI can
+ * suggest 15-min splits instead.
+ */
+export class SlotConflictError extends Error {
+  constructor(public takenAt: string) {
+    super("Slot conflict");
+    this.name = "SlotConflictError";
+  }
+}
+
+export async function createBooking(
+  input: CreateVisitInput & { bookedFor: string },
+): Promise<Visit> {
+  const sb = getSupabase();
+  const slotIso = new Date(input.bookedFor).toISOString();
+
+  // Pre-flight check — anyone else holding this exact timestamp?
+  const { data: clash, error: clashErr } = await sb
+    .from("visits")
+    .select("id,booked_for")
+    .eq("clinic_id", input.clinicId)
+    .eq("booked_for", slotIso)
+    .neq("status", "dropped")
+    .limit(1);
+  if (clashErr) throw clashErr;
+  if (clash && clash.length > 0) {
+    throw new SlotConflictError(slotIso);
+  }
+
+  const token = await nextTokenForClinic(input.clinicId);
+  const { data, error } = await sb
+    .from("visits")
+    .insert({
+      clinic_id: input.clinicId,
+      token,
+      patient_name: input.patientName,
+      age: input.age,
+      gender: input.gender,
+      mobile: input.mobile,
+      source: input.source,
+      status: "waiting",
+      reason: input.reason ?? null,
+      booked_for: slotIso,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Visit;
 }
 
 export async function createVisit(input: CreateVisitInput): Promise<Visit> {
