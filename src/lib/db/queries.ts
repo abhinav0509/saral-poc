@@ -142,6 +142,139 @@ export async function getPrescriptionForVisit(
   return (data as Prescription | null) ?? null;
 }
 
+/**
+ * Cross-field patient search. Matches on patient_name (case-insensitive),
+ * mobile (last-N digits), or token. Returns the most recent visit per
+ * patient (deduplicated by mobile-or-name) so each search row represents
+ * one patient, not one visit.
+ */
+export interface PatientSearchRow {
+  visitId: string;
+  patientName: string;
+  mobile: string | null;
+  age: number | null;
+  gender: string | null;
+  lastVisitAt: string;
+  lastReason: string | null;
+  visitCount: number;
+}
+
+export async function searchPatients(
+  clinicId: string,
+  rawQuery: string,
+): Promise<PatientSearchRow[]> {
+  const q = rawQuery.trim();
+  if (q.length < 2) return [];
+
+  // Build an OR filter against the three searchable columns.
+  // Mobile match strips non-digits so "98765" finds "+919876543210" too.
+  const digits = q.replace(/\D/g, "");
+  const orParts = [
+    `patient_name.ilike.%${q}%`,
+    `token.ilike.%${q}%`,
+  ];
+  if (digits.length >= 3) {
+    orParts.push(`mobile.ilike.%${digits}%`);
+  }
+
+  const { data, error } = await getSupabase()
+    .from("visits")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .or(orParts.join(","))
+    .order("created_at", { ascending: false })
+    .limit(80);
+  if (error) throw error;
+  const rows = (data as Visit[] | null) ?? [];
+
+  // Dedupe: one row per patient. Key = last 10 digits of mobile, else name+age.
+  const byKey = new Map<string, PatientSearchRow>();
+  for (const v of rows) {
+    const m = (v.mobile ?? "").replace(/\D/g, "").slice(-10);
+    const key = m.length === 10 ? `m:${m}` : `n:${v.patient_name.toLowerCase()}|${v.age ?? "?"}`;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, {
+        visitId: v.id,
+        patientName: v.patient_name,
+        mobile: v.mobile,
+        age: v.age,
+        gender: v.gender,
+        lastVisitAt: v.created_at,
+        lastReason: v.reason,
+        visitCount: 1,
+      });
+    } else {
+      existing.visitCount += 1;
+    }
+  }
+  return Array.from(byKey.values()).slice(0, 30);
+}
+
+/**
+ * Follow-up reminder feed. Joins prescriptions with their visit so each
+ * row carries who, when they were last seen, and what the doctor wrote
+ * for the follow-up note. We compute a soft "due date" client-side by
+ * parsing a digit run in the note (e.g. "5 days", "in 7 days").
+ */
+export interface ReminderRow {
+  visitId: string;
+  prescriptionId: string;
+  patientName: string;
+  mobile: string | null;
+  age: number | null;
+  lastVisitAt: string;
+  lastReason: string | null;
+  followUpNote: string;
+  sentAt: string | null;
+}
+
+export async function getPatientsWithFollowUps(
+  clinicId: string,
+): Promise<ReminderRow[]> {
+  // Fetch prescriptions with a follow_up_note, then enrich with visit data.
+  // Two-step query — simpler than a Supabase relational select and avoids
+  // RLS gotchas when the join policy is permissive.
+  const { data: pres, error: pErr } = await getSupabase()
+    .from("prescriptions")
+    .select("*")
+    .not("follow_up_note", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (pErr) throw pErr;
+  const presRows = (pres as Prescription[] | null) ?? [];
+  if (presRows.length === 0) return [];
+
+  const visitIds = presRows.map((p) => p.visit_id);
+  const { data: visits, error: vErr } = await getSupabase()
+    .from("visits")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .in("id", visitIds);
+  if (vErr) throw vErr;
+  const visitMap = new Map<string, Visit>();
+  for (const v of (visits as Visit[] | null) ?? []) visitMap.set(v.id, v);
+
+  // One row per prescription, only those whose visit belongs to this clinic
+  const rows: ReminderRow[] = [];
+  for (const p of presRows) {
+    const v = visitMap.get(p.visit_id);
+    if (!v) continue;
+    rows.push({
+      visitId: v.id,
+      prescriptionId: p.id,
+      patientName: v.patient_name,
+      mobile: v.mobile,
+      age: v.age,
+      lastVisitAt: v.created_at,
+      lastReason: v.reason,
+      followUpNote: p.follow_up_note ?? "",
+      sentAt: p.sent_at,
+    });
+  }
+  return rows;
+}
+
 export async function getQueueContext(visit: Visit): Promise<{
   aheadCount: number;
   etaMinutes: number;

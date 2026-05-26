@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, List, Calendar, MoreHorizontal } from "lucide-react";
+import { Home, List, Search, Calendar, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -12,24 +12,23 @@ interface NavItem {
 }
 
 /**
- * 4-tab persistent bottom nav for staff app surfaces.
+ * 5-tab persistent bottom nav for staff app surfaces.
  *
+ * Search lives in the center — patient-lookup is the most common
+ * cross-surface need (user testing surfaced this as a discovery gap).
  * Fixed-position so it ALWAYS sits at the viewport bottom regardless
- * of page scroll or content length. Page content needs `pb-20`-ish
- * bottom padding to scroll past it.
- *
- * Only "Queue" is wired up for v1; other tabs go to splash for now —
- * visual completeness signals the full surface to the receptionist.
+ * of page scroll. Page content needs ~pb-24 bottom padding.
  */
 export function StaffBottomNav({
   active,
 }: {
-  active?: "home" | "queue" | "calendar" | "more";
+  active?: "home" | "queue" | "search" | "calendar" | "more";
 }) {
   const pathname = usePathname();
   const items: (NavItem & { key: NonNullable<typeof active> })[] = [
     { key: "home",     label: "Home",     href: "/staff",          icon: <Home size={22} strokeWidth={2} /> },
     { key: "queue",    label: "Queue",    href: "/staff/queue",    icon: <List size={22} strokeWidth={2} /> },
+    { key: "search",   label: "Search",   href: "/staff/search",   icon: <Search size={22} strokeWidth={2} /> },
     { key: "calendar", label: "Calendar", href: "/staff/calendar", icon: <Calendar size={22} strokeWidth={2} /> },
     { key: "more",     label: "More",     href: "/staff",          icon: <MoreHorizontal size={22} strokeWidth={2} /> },
   ];
@@ -40,16 +39,18 @@ export function StaffBottomNav({
       ? "home"
       : pathname?.startsWith("/staff/queue")
         ? "queue"
-        : pathname?.startsWith("/staff/calendar")
-          ? "calendar"
-          : "home");
+        : pathname?.startsWith("/staff/search")
+          ? "search"
+          : pathname?.startsWith("/staff/calendar")
+            ? "calendar"
+            : "home");
 
   return (
     <nav
       className="fixed bottom-0 inset-x-0 z-30 bg-surface-canvas/95 backdrop-blur-md border-t border-border-subtle pb-[env(safe-area-inset-bottom)]"
       aria-label="Primary"
     >
-      <div className="max-w-md mx-auto grid grid-cols-4">
+      <div className="max-w-md mx-auto grid grid-cols-5">
         {items.map((it) => {
           const isActive = activeTab === it.key;
           return (

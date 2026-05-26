@@ -10,6 +10,8 @@ import {
   Phone,
   Stethoscope,
   X,
+  UserPlus,
+  BellRing,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { StaffBottomNav } from "@/components/staff/StaffBottomNav";
@@ -284,13 +286,13 @@ export function DashboardClient({
           </p>
           <div className="grid grid-cols-3 gap-3">
             <QuickAction
-              label="New booking"
-              icon={<Plus size={22} strokeWidth={2.2} />}
-              href="/staff/booking/new"
+              label="Send reminders"
+              icon={<BellRing size={22} strokeWidth={2.2} />}
+              href="/staff/reminders"
             />
             <QuickAction
               label="Walk-in"
-              icon={<Plus size={22} strokeWidth={2.2} />}
+              icon={<UserPlus size={22} strokeWidth={2.2} />}
               href="/staff/walkin"
             />
             <QuickAction
