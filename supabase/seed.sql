@@ -12,7 +12,7 @@ INSERT INTO clinics (id, code, name, address, doctor_name) VALUES
   ('11111111-1111-1111-1111-111111111111',
    'drmehta',
    'Dr. Mehta''s Clinic',
-   'MG Road, Bengaluru',
+   'Powai, Mumbai',
    'Dr. Mehta');
 
 -- Starting queue (1 serving + 3 waiting)
