@@ -116,18 +116,6 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
         A few quick details and we&apos;ll send you a live queue link.
       </p>
 
-      {toast && (
-        <div className="mt-5">
-          <Toast
-            tone={toast.tone}
-            title={toast.title}
-            description={toast.desc}
-            autoHide={4500}
-            onDismiss={() => setToast(null)}
-          />
-        </div>
-      )}
-
       {/* ─── YOU ─── */}
       <SectionHeading>About you</SectionHeading>
       <div className="flex flex-col gap-5">
@@ -247,6 +235,19 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
       <p className="mt-6 text-caption text-text-tertiary text-center">
         Powered by Saral · Your details are private
       </p>
+
+      {/* Floating toast — always above the sticky CTA, regardless of scroll */}
+      {toast && (
+        <div className="fixed bottom-36 inset-x-0 max-w-md mx-auto px-4 z-30 animate-in fade-in slide-in-from-bottom duration-200">
+          <Toast
+            tone={toast.tone}
+            title={toast.title}
+            description={toast.desc}
+            autoHide={4500}
+            onDismiss={() => setToast(null)}
+          />
+        </div>
+      )}
 
       {/* Sticky bottom CTA */}
       <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] z-20">

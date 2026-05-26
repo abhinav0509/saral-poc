@@ -281,13 +281,18 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
     onChange,
   ]);
 
-  const [conflictSplits, setConflictSplits] = useState<string[] | null>(null);
+  const [conflictSplits, setConflictSplits] = useState<{
+    takenTime: string;
+    options: string[];
+  } | null>(null);
 
   // When parent reports a conflict from the server, surface splits inline
   useEffect(() => {
     if (!conflictHint) return;
     const splits = suggestSplits(conflictHint.time, bookedMap);
-    setConflictSplits(splits.length > 0 ? splits : null);
+    setConflictSplits(
+      splits.length > 0 ? { takenTime: conflictHint.time, options: splits } : null,
+    );
   }, [conflictHint, bookedMap]);
 
   function handlePick(time: string, alreadyBooked: boolean, past: boolean) {
@@ -301,12 +306,12 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
     if (alreadyBooked) {
       const splits = suggestSplits(time, bookedMap);
       if (splits.length > 0) {
-        setConflictSplits(splits);
-        onNotice?.({
-          title: `${formatSlotTime(time)} is taken`,
-          desc: `Try ${splits.map(formatSlotTime).join(" or ")} in the same hour.`,
-        });
+        // Render the splits card inline near the slot the user just tapped —
+        // no toast, since both would land at the same screen position and
+        // double-explain the same situation.
+        setConflictSplits({ takenTime: time, options: splits });
       } else {
+        // No splits possible → fall back to a toast (it's the only signal)
         onNotice?.({
           title: `${formatSlotTime(time)} is taken`,
           desc: "Nearby slots are full. Pick another time.",
@@ -402,43 +407,52 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
         </div>
       </div>
 
-      {/* Three period sections */}
-      <SlotSection
-        heading="Morning"
-        icon={<Sun size={14} />}
-        slots={MORNING_SLOTS}
-        selectedTime={selected?.dateIso === selectedDate ? selected?.time : null}
-        bookedMap={bookedMap}
-        slotIsPast={slotIsPast}
-        onPick={handlePick}
-        loading={loadingSlots}
-      />
-      <SlotSection
-        heading="Afternoon"
-        icon={<Sunset size={14} />}
-        slots={AFTERNOON_SLOTS}
-        selectedTime={selected?.dateIso === selectedDate ? selected?.time : null}
-        bookedMap={bookedMap}
-        slotIsPast={slotIsPast}
-        onPick={handlePick}
-        loading={loadingSlots}
-      />
-      <SlotSection
-        heading="Evening"
-        icon={<Moon size={14} />}
-        slots={EVENING_SLOTS}
-        selectedTime={selected?.dateIso === selectedDate ? selected?.time : null}
-        bookedMap={bookedMap}
-        slotIsPast={slotIsPast}
-        onPick={handlePick}
-        loading={loadingSlots}
-      />
+      {/* Three period sections — sections fully past on today are hidden */}
+      {(() => {
+        const sections = [
+          { key: "morning", heading: "Morning", icon: <Sun size={14} />, slots: MORNING_SLOTS },
+          { key: "afternoon", heading: "Afternoon", icon: <Sunset size={14} />, slots: AFTERNOON_SLOTS },
+          { key: "evening", heading: "Evening", icon: <Moon size={14} />, slots: EVENING_SLOTS },
+        ];
+        const visible = sections.filter(
+          (s) => !isToday || !s.slots.every(slotIsPast),
+        );
 
-      {conflictSplits && conflictSplits.length > 0 && (
+        if (!loadingSlots && visible.length === 0) {
+          return (
+            <Card surface="raised" className="p-5 text-center flex flex-col gap-2 items-center">
+              <p className="text-label-md font-semibold text-text-primary">
+                Clinic hours are done for today
+              </p>
+              <p className="text-body-sm text-text-secondary leading-snug max-w-[260px]">
+                Pick Tomorrow above to see fresh slots from 9 AM.
+              </p>
+            </Card>
+          );
+        }
+
+        return visible.map((s) => (
+          <SlotSection
+            key={s.key}
+            heading={s.heading}
+            icon={s.icon}
+            slots={s.slots}
+            selectedTime={
+              selected?.dateIso === selectedDate ? selected?.time : null
+            }
+            bookedMap={bookedMap}
+            slotIsPast={slotIsPast}
+            onPick={handlePick}
+            loading={loadingSlots}
+          />
+        ));
+      })()}
+
+      {conflictSplits && conflictSplits.options.length > 0 && (
         <Card
           surface="raised"
           bordered
-          className="p-3 flex flex-col gap-2 border-amber-300"
+          className="p-3.5 flex flex-col gap-2.5 border-amber-300 animate-in fade-in slide-in-from-bottom duration-200"
         >
           <div className="flex items-start gap-2">
             <AlertTriangle
@@ -446,12 +460,14 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
               className="text-text-warning flex-none mt-0.5"
             />
             <p className="text-caption text-text-primary leading-snug">
-              Just-as-good alternates in the same hour — tap one to fill the
-              gap.
+              <span className="font-semibold tnum">
+                {formatSlotTime(conflictSplits.takenTime)}
+              </span>{" "}
+              is taken. Try these instead — same hour, still free.
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {conflictSplits.map((t) => (
+            {conflictSplits.options.map((t) => (
               <button
                 type="button"
                 key={t}

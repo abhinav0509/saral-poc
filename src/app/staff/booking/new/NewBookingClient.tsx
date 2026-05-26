@@ -134,16 +134,6 @@ export function NewBookingClient({ clinicId, clinicName }: Props) {
           </div>
         </Card>
 
-        {toast && (
-          <Toast
-            tone={toast.tone}
-            title={toast.title}
-            description={toast.desc}
-            autoHide={4500}
-            onDismiss={() => setToast(null)}
-          />
-        )}
-
         <div className="flex flex-col gap-1.5">
           <label className="text-label-md font-medium text-text-secondary">
             How did they book?
@@ -256,7 +246,20 @@ export function NewBookingClient({ clinicId, clinicName }: Props) {
         />
       </form>
 
-      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-5 z-20">
+      {/* Floating toast — sits above the sticky CTA, always visible */}
+      {toast && (
+        <div className="fixed bottom-36 inset-x-0 max-w-md mx-auto px-4 z-30 animate-in fade-in slide-in-from-bottom duration-200">
+          <Toast
+            tone={toast.tone}
+            title={toast.title}
+            description={toast.desc}
+            autoHide={4500}
+            onDismiss={() => setToast(null)}
+          />
+        </div>
+      )}
+
+      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] z-20">
         {slot && (
           <p className="text-caption text-text-secondary mb-2 px-1">
             Booking for{" "}

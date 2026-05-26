@@ -147,18 +147,6 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
           next free slot.
         </p>
 
-        {toast && (
-          <div className="mb-4">
-            <Toast
-              tone={toast.tone}
-              title={toast.title}
-              description={toast.desc}
-              autoHide={4500}
-              onDismiss={() => setToast(null)}
-            />
-          </div>
-        )}
-
         {/* ─── SECTION 1 · PATIENT ─── */}
         <SectionHeading>Patient</SectionHeading>
         <div className="flex flex-col gap-5">
@@ -251,6 +239,19 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
           />
         </div>
       </form>
+
+      {/* Floating toast — always sits above the sticky CTA, no matter scroll */}
+      {toast && (
+        <div className="fixed bottom-36 inset-x-0 max-w-md mx-auto px-4 z-30 animate-in fade-in slide-in-from-bottom duration-200">
+          <Toast
+            tone={toast.tone}
+            title={toast.title}
+            description={toast.desc}
+            autoHide={4500}
+            onDismiss={() => setToast(null)}
+          />
+        </div>
+      )}
 
       {/* ─── STICKY CONFIRM ─── */}
       <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] z-20">
