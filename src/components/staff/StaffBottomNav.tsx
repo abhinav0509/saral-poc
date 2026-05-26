@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, List, Search, Calendar, MoreHorizontal } from "lucide-react";
+import { Home, Users, Search, Calendar, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -27,7 +27,7 @@ export function StaffBottomNav({
   const pathname = usePathname();
   const items: (NavItem & { key: NonNullable<typeof active> })[] = [
     { key: "home",     label: "Home",     href: "/staff",          icon: <Home size={22} strokeWidth={2} /> },
-    { key: "queue",    label: "Queue",    href: "/staff/queue",    icon: <List size={22} strokeWidth={2} /> },
+    { key: "queue",    label: "Queue",    href: "/staff/queue",    icon: <Users size={22} strokeWidth={2} /> },
     { key: "search",   label: "Search",   href: "/staff/search",   icon: <Search size={22} strokeWidth={2} /> },
     { key: "calendar", label: "Calendar", href: "/staff/calendar", icon: <Calendar size={22} strokeWidth={2} /> },
     { key: "more",     label: "More",     href: "/staff",          icon: <MoreHorizontal size={22} strokeWidth={2} /> },
