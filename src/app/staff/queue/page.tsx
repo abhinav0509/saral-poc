@@ -12,8 +12,10 @@ import {
   Share2,
   CheckCircle2,
   ChevronRight,
+  Clock,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
+import { DelaySheet } from "./DelaySheet";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { Card } from "@/components/ui/Card";
 import { SourceBadge } from "@/components/ui/SourceBadge";
@@ -50,6 +52,7 @@ export default function StaffQueuePage() {
     action?: { label: string; onClick: () => void };
   } | null>(null);
   const [dropConfirm, setDropConfirm] = useState<Visit | null>(null);
+  const [delayOpen, setDelayOpen] = useState(false);
   const [pending, startPending] = useTransition();
   const [tab, setTab] = useState<TabKey>("waiting");
   const [search, setSearch] = useState("");
@@ -457,10 +460,22 @@ export default function StaffQueuePage() {
                 ? `${filteredList.length} done today`
                 : `${filteredList.length} today`}
           </span>
-          <span className="inline-flex items-center gap-1.5 text-caption text-text-tertiary">
-            <span className="size-1.5 rounded-full bg-sage-500" />
-            Auto-updates
-          </span>
+          <div className="inline-flex items-center gap-3">
+            {tab === "waiting" && waiting.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setDelayOpen(true)}
+                className="inline-flex items-center gap-1 text-caption font-semibold text-text-brand hover:text-primary-600 transition-colors"
+              >
+                <Clock size={12} />
+                Notify delay
+              </button>
+            )}
+            <span className="inline-flex items-center gap-1.5 text-caption text-text-tertiary">
+              <span className="size-1.5 rounded-full bg-sage-500" />
+              Auto-updates
+            </span>
+          </div>
         </div>
 
         {loading && filteredList.length === 0 ? (
@@ -524,6 +539,23 @@ export default function StaffQueuePage() {
           onConfirm={() => handleDrop(dropConfirm)}
           onClose={() => setDropConfirm(null)}
           pending={pending}
+        />
+      )}
+
+      {delayOpen && clinic && (
+        <DelaySheet
+          clinic={clinic}
+          waiting={waiting}
+          onClose={() => setDelayOpen(false)}
+          onApplied={() => {
+            setDelayOpen(false);
+            void load();
+            setToast({
+              tone: "success",
+              title: "Queue delay applied",
+              desc: "All waiting patients pushed back.",
+            });
+          }}
         />
       )}
     </main>

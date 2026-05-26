@@ -1,5 +1,12 @@
 import { getSupabase } from "./client";
-import type { Clinic, Visit, VisitSource, Prescription } from "./types";
+import type {
+  Clinic,
+  Visit,
+  VisitSource,
+  Prescription,
+  ClinicBlock,
+  BlockKind,
+} from "./types";
 
 /**
  * Note on typing:
@@ -495,6 +502,137 @@ export async function savePrescription(
     .single();
   if (error) throw error;
   return data as Prescription;
+}
+
+/* ============================================================
+   CLINIC BLOCKS · doctor unavailability
+   ============================================================ */
+
+/** All blocks overlapping a given calendar day (local TZ). */
+export async function getBlocksForDate(
+  clinicId: string,
+  isoDate: string,
+): Promise<ClinicBlock[]> {
+  const startOfDay = new Date(`${isoDate}T00:00:00`);
+  const endOfDay = new Date(`${isoDate}T23:59:59.999`);
+  // A block overlaps the day if starts_at <= endOfDay AND ends_at >= startOfDay
+  const { data, error } = await getSupabase()
+    .from("clinic_blocks")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .lte("starts_at", endOfDay.toISOString())
+    .gte("ends_at", startOfDay.toISOString())
+    .order("starts_at", { ascending: true });
+  if (error) throw error;
+  return (data as ClinicBlock[] | null) ?? [];
+}
+
+/** All blocks within a date range — used by calendar week view. */
+export async function getBlocksBetween(
+  clinicId: string,
+  fromIso: string,
+  toIso: string,
+): Promise<ClinicBlock[]> {
+  const { data, error } = await getSupabase()
+    .from("clinic_blocks")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .lte("starts_at", toIso)
+    .gte("ends_at", fromIso)
+    .order("starts_at", { ascending: true });
+  if (error) throw error;
+  return (data as ClinicBlock[] | null) ?? [];
+}
+
+interface CreateBlockInput {
+  clinicId: string;
+  startsAt: string;
+  endsAt: string;
+  kind: BlockKind;
+  title: string;
+  patientName?: string | null;
+  notes?: string | null;
+}
+
+export async function createBlock(
+  input: CreateBlockInput,
+): Promise<ClinicBlock> {
+  const { data, error } = await getSupabase()
+    .from("clinic_blocks")
+    .insert({
+      clinic_id: input.clinicId,
+      starts_at: input.startsAt,
+      ends_at: input.endsAt,
+      kind: input.kind,
+      title: input.title,
+      patient_name: input.patientName ?? null,
+      notes: input.notes ?? null,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as ClinicBlock;
+}
+
+export async function deleteBlock(blockId: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("clinic_blocks")
+    .delete()
+    .eq("id", blockId);
+  if (error) throw error;
+}
+
+/* ============================================================
+   QUEUE DELAY · push all waiting visits forward by N minutes
+   ============================================================ */
+
+export interface DelayResult {
+  shifted: number;
+  visits: Visit[];
+}
+
+/**
+ * Shifts every waiting visit's booked_for by +N minutes. Used when the
+ * doctor takes an emergency and needs to push everyone back.
+ * Returns the updated visits so the UI can render WhatsApp drafts per
+ * patient (the caller decides whether to send manually or batch).
+ */
+export async function delayQueue(
+  clinicId: string,
+  minutes: number,
+): Promise<DelayResult> {
+  if (minutes <= 0 || minutes > 240) {
+    throw new Error("Delay must be between 1 and 240 minutes");
+  }
+  const sb = getSupabase();
+  // Fetch current waiting visits
+  const { data: waiting, error: wErr } = await sb
+    .from("visits")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .eq("status", "waiting");
+  if (wErr) throw wErr;
+  const rows = (waiting as Visit[] | null) ?? [];
+  if (rows.length === 0) return { shifted: 0, visits: [] };
+
+  // Compute new booked_for for each (fall back to "now" if absent)
+  const shiftMs = minutes * 60_000;
+  const updated: Visit[] = [];
+  for (const v of rows) {
+    const base = v.booked_for
+      ? new Date(v.booked_for).getTime()
+      : Date.now();
+    const newBookedFor = new Date(base + shiftMs).toISOString();
+    const { data, error } = await sb
+      .from("visits")
+      .update({ booked_for: newBookedFor })
+      .eq("id", v.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+    updated.push(data as Visit);
+  }
+  return { shifted: updated.length, visits: updated };
 }
 
 export async function uploadPrescriptionPhoto(

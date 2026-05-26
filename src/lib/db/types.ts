@@ -56,6 +56,20 @@ export interface ClinicEvent {
   created_at: string;
 }
 
+export type BlockKind = "surgery" | "emergency" | "leave" | "meeting" | "other";
+
+export interface ClinicBlock {
+  id: string;
+  clinic_id: string;
+  starts_at: string;
+  ends_at: string;
+  kind: BlockKind;
+  title: string;
+  patient_name: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 /** Supabase typing — used by the supabase-js client. */
 export interface Database {
   public: {

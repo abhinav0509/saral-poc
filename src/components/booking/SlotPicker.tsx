@@ -11,9 +11,9 @@ import {
 } from "react";
 import { Sun, Sunset, Moon, CalendarRange, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { getBookingsForDate } from "@/lib/db/queries";
+import { getBookingsForDate, getBlocksForDate } from "@/lib/db/queries";
 import { getSupabase } from "@/lib/db/client";
-import type { Visit } from "@/lib/db/types";
+import type { Visit, ClinicBlock } from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
 /* ============================================================
@@ -76,13 +76,27 @@ export function combineDateTime(isoDate: string, hhmm: string): Date {
    ============================================================ */
 
 export interface BookedMap {
+  /** 30-min slot times where a patient booking exists */
   takenSlots: Set<string>;
+  /** 30-min slot times where the doctor is unavailable (surgery/leave/etc) */
+  blockedSlots: Set<string>;
+  /** Any minute-precise offset (00, 15, 30, 45) taken — used for splits */
   takenOffsets: Set<string>;
+  /** Block info keyed by slot time, so the UI can show "why" if needed */
+  blockReason: Map<string, { kind: string; title: string }>;
 }
 
-function buildBookedMap(bookings: Visit[]): BookedMap {
+function buildBookedMap(
+  bookings: Visit[],
+  blocks: ClinicBlock[],
+  isoDate: string,
+): BookedMap {
   const takenSlots = new Set<string>();
+  const blockedSlots = new Set<string>();
   const takenOffsets = new Set<string>();
+  const blockReason = new Map<string, { kind: string; title: string }>();
+
+  // Patient bookings
   for (const b of bookings) {
     if (!b.booked_for) continue;
     const d = new Date(b.booked_for);
@@ -92,7 +106,31 @@ function buildBookedMap(bookings: Visit[]): BookedMap {
     takenOffsets.add(key);
     if (d.getMinutes() === 0 || d.getMinutes() === 30) takenSlots.add(key);
   }
-  return { takenSlots, takenOffsets };
+
+  // Doctor blocks — mark every 30-min slot inside [starts_at, ends_at)
+  // as blocked on the selected date. A block can span outside the day,
+  // so we clip to today's bounds.
+  const dayStart = new Date(`${isoDate}T00:00:00`).getTime();
+  const dayEnd = new Date(`${isoDate}T23:59:59.999`).getTime();
+  for (const blk of blocks) {
+    const s = Math.max(new Date(blk.starts_at).getTime(), dayStart);
+    const e = Math.min(new Date(blk.ends_at).getTime(), dayEnd);
+    // Walk every 30 min from s (rounded down) to e (exclusive)
+    let cursor = new Date(s);
+    cursor.setMinutes(cursor.getMinutes() < 30 ? 0 : 30, 0, 0);
+    while (cursor.getTime() < e) {
+      const hh = String(cursor.getHours()).padStart(2, "0");
+      const mm = String(cursor.getMinutes()).padStart(2, "0");
+      const key = `${hh}:${mm}`;
+      blockedSlots.add(key);
+      takenOffsets.add(key);
+      if (!blockReason.has(key)) {
+        blockReason.set(key, { kind: blk.kind, title: blk.title });
+      }
+      cursor = new Date(cursor.getTime() + 30 * 60_000);
+    }
+  }
+  return { takenSlots, blockedSlots, takenOffsets, blockReason };
 }
 
 export function suggestSplits(takenTime: string, map: BookedMap): string[] {
@@ -192,6 +230,7 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
   const [customDate, setCustomDate] = useState<string | null>(null);
 
   const [bookings, setBookings] = useState<Visit[]>([]);
+  const [blocks, setBlocks] = useState<ClinicBlock[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [now, setNow] = useState(() => new Date());
 
@@ -205,8 +244,19 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
   const loadAvailability = useCallback(async () => {
     try {
       setLoadingSlots(true);
-      const rows = await getBookingsForDate(clinicId, selectedDate);
-      setBookings(rows);
+      const bookingRows = await getBookingsForDate(clinicId, selectedDate);
+      setBookings(bookingRows);
+      // Blocks table is optional — slot picker still works without it
+      try {
+        const blockRows = await getBlocksForDate(clinicId, selectedDate);
+        setBlocks(blockRows);
+      } catch (blkErr) {
+        console.warn(
+          "[slot-picker] blocks unavailable — run migration 0002",
+          blkErr,
+        );
+        setBlocks([]);
+      }
     } catch (e) {
       console.error("[slot-picker] load failed", e);
     } finally {
@@ -235,13 +285,26 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
         },
         () => void loadAvailability(),
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "clinic_blocks",
+          filter: `clinic_id=eq.${clinicId}`,
+        },
+        () => void loadAvailability(),
+      )
       .subscribe();
     return () => {
       void channel.unsubscribe();
     };
   }, [clinicId, loadAvailability]);
 
-  const bookedMap = useMemo(() => buildBookedMap(bookings), [bookings]);
+  const bookedMap = useMemo(
+    () => buildBookedMap(bookings, blocks, selectedDate),
+    [bookings, blocks, selectedDate],
+  );
 
   const isToday = selectedDate === dateStrip[0].iso;
   const nowMinutes = isToday ? now.getHours() * 60 + now.getMinutes() : -1;
@@ -264,6 +327,7 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
     const next = ALL_SLOTS.find(
       (s) =>
         !bookedMap.takenSlots.has(s.time) &&
+        !bookedMap.blockedSlots.has(s.time) &&
         !(isToday && s.hour * 60 + s.minute <= nowMinutes),
     );
     if (next) {
@@ -300,6 +364,16 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
       onNotice?.({
         title: "Time has passed",
         desc: "Pick a future slot or a different date.",
+      });
+      return;
+    }
+    if (bookedMap.blockedSlots.has(time)) {
+      const reason = bookedMap.blockReason.get(time);
+      onNotice?.({
+        title: "Doctor unavailable",
+        desc: reason
+          ? `${formatSlotTime(time)} · ${reason.title}`
+          : `${formatSlotTime(time)} is blocked on the calendar.`,
       });
       return;
     }
@@ -508,7 +582,9 @@ function SlotSection({
   loading: boolean;
 }) {
   const total = slots.length;
-  const taken = slots.filter((s) => bookedMap.takenSlots.has(s.time)).length;
+  const taken = slots.filter(
+    (s) => bookedMap.takenSlots.has(s.time) || bookedMap.blockedSlots.has(s.time),
+  ).length;
   const past = slots.filter(slotIsPast).length;
   const free = total - taken - past;
 
@@ -526,26 +602,33 @@ function SlotSection({
       <div className="grid grid-cols-3 gap-2">
         {slots.map((s) => {
           const isBooked = bookedMap.takenSlots.has(s.time);
+          const isBlocked = bookedMap.blockedSlots.has(s.time);
           const isPast = slotIsPast(s);
           const isSelected = selectedTime === s.time;
+          const blockReason = isBlocked
+            ? bookedMap.blockReason.get(s.time)
+            : null;
           return (
             <button
               type="button"
               key={s.time}
-              onClick={() => onPick(s.time, isBooked, isPast)}
+              onClick={() => onPick(s.time, isBooked || isBlocked, isPast)}
               disabled={loading}
               aria-pressed={isSelected}
-              aria-disabled={isBooked || isPast}
+              aria-disabled={isBooked || isBlocked || isPast}
+              title={blockReason ? `Doctor: ${blockReason.title}` : undefined}
               className={cn(
                 "h-12 rounded-xl border text-label-md font-semibold tnum transition-colors",
                 "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus",
                 isSelected
                   ? "bg-surface-brand text-white border-transparent"
-                  : isBooked
-                    ? "bg-surface-sunken text-text-tertiary border-border-subtle line-through cursor-not-allowed"
-                    : isPast
-                      ? "bg-surface-sunken text-text-tertiary border-border-subtle opacity-60 cursor-not-allowed"
-                      : "bg-surface-canvas text-text-primary border-border-default hover:bg-surface-raised",
+                  : isBlocked
+                    ? "bg-amber-50 text-text-warning border-amber-200 cursor-not-allowed"
+                    : isBooked
+                      ? "bg-surface-sunken text-text-tertiary border-border-subtle line-through cursor-not-allowed"
+                      : isPast
+                        ? "bg-surface-sunken text-text-tertiary border-border-subtle opacity-60 cursor-not-allowed"
+                        : "bg-surface-canvas text-text-primary border-border-default hover:bg-surface-raised",
               )}
             >
               {formatSlotTime(s.time)}
