@@ -1,13 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Clock } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Toast } from "@/components/ui/Toast";
-import { createVisit } from "@/lib/db/queries";
+import {
+  SlotPicker,
+  combineDateTime,
+  formatSlotTime,
+  type SlotPickerHandle,
+  type SlotSelection,
+} from "@/components/booking/SlotPicker";
+import { createBooking, SlotConflictError } from "@/lib/db/queries";
 import { cn } from "@/lib/utils";
 
 type Gender = "Female" | "Male" | "Other";
@@ -27,7 +34,17 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
   const [mobile, setMobile] = useState("");
   const [reason, setReason] = useState("");
   const [consent, setConsent] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [slot, setSlot] = useState<SlotSelection | null>(null);
+  const [conflictHint, setConflictHint] = useState<{ time: string } | null>(
+    null,
+  );
+  const [toast, setToast] = useState<{
+    tone: "error" | "info" | "success";
+    title: string;
+    desc?: string;
+  } | null>(null);
+
+  const pickerRef = useRef<SlotPickerHandle>(null);
 
   function validate(): string | null {
     if (name.trim().length < 2) return "Please enter your full name";
@@ -38,21 +55,25 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
     const cleanedMobile = mobile.replace(/\D/g, "");
     if (cleanedMobile.length < 10) return "Please enter a valid mobile number";
     if (!consent) return "We need your consent to save these details";
+    if (!slot) return "Pick a time slot that works for you";
     return null;
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     const msg = validate();
     if (msg) {
-      setError(msg);
+      setToast({ tone: "error", title: "Hold on", desc: msg });
       return;
     }
-    setError(null);
 
     startTransition(async () => {
       try {
-        const visit = await createVisit({
+        const bookedFor = combineDateTime(
+          slot!.dateIso,
+          slot!.time,
+        ).toISOString();
+        const visit = await createBooking({
           clinicId,
           patientName: name.trim(),
           age: parseInt(age, 10),
@@ -60,11 +81,25 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
           mobile: mobile.replace(/\D/g, "").slice(-10),
           source: "qr",
           reason: reason.trim() || null,
+          bookedFor,
         });
         router.push(`/v/${encodeURIComponent(visit.token)}`);
       } catch (err: unknown) {
-        const m = err instanceof Error ? err.message : "Couldn't save your check-in";
-        setError(m);
+        if (err instanceof SlotConflictError) {
+          const takenTime = slot!.time;
+          setSlot(null);
+          setConflictHint({ time: takenTime });
+          await pickerRef.current?.refresh();
+          setToast({
+            tone: "error",
+            title: "That slot just got taken",
+            desc: "Pick one of the suggested alternates below.",
+          });
+          return;
+        }
+        const m =
+          err instanceof Error ? err.message : "Couldn't save your check-in";
+        setToast({ tone: "error", title: "Couldn't save", desc: m });
       }
     });
   }
@@ -72,19 +107,29 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex-1 flex flex-col px-5 py-5 gap-5"
+      className="flex-1 flex flex-col px-4 py-5 gap-5 pb-32"
     >
       {/* Welcome banner */}
       <Card surface="raised" className="p-4">
         <p className="text-h3 font-bold text-text-primary leading-tight">
-          Welcome 👋
+          Welcome
         </p>
         <p className="mt-1 text-body-sm text-text-secondary leading-snug">
-          Just 4 quick details and you&apos;ll get a token with your expected time.
+          A few quick details and your slot — you&apos;ll get a token with your
+          expected time.
         </p>
       </Card>
 
-      {/* Name */}
+      {toast && (
+        <Toast
+          tone={toast.tone}
+          title={toast.title}
+          description={toast.desc}
+          autoHide={4500}
+          onDismiss={() => setToast(null)}
+        />
+      )}
+
       <Input
         label="Patient name"
         placeholder="e.g. Riya Sharma"
@@ -94,7 +139,6 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
         name="name"
       />
 
-      {/* Age + Gender side by side */}
       <div className="flex gap-3">
         <div className="w-24">
           <Input
@@ -121,7 +165,6 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
                   onClick={() => setGender(g)}
                   className={cn(
                     "h-12 rounded-xl border text-label-md font-medium transition-colors",
-                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-focus",
                     active
                       ? "bg-surface-inverse text-text-inverse border-transparent"
                       : "bg-surface-canvas text-text-primary border-border-default hover:bg-surface-raised",
@@ -136,20 +179,20 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
         </div>
       </div>
 
-      {/* Mobile */}
       <Input
         label="Mobile number"
         inputMode="tel"
         placeholder="10-digit mobile"
         autoComplete="tel-national"
         value={mobile}
-        onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+        onChange={(e) =>
+          setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))
+        }
         maxLength={10}
         helperText="We'll send your queue link here."
         name="mobile"
       />
 
-      {/* Reason (optional) */}
       <Input
         label="What brings you in? (optional)"
         placeholder="Fever, body ache…"
@@ -158,7 +201,20 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
         name="reason"
       />
 
-      {/* Consent */}
+      {/* Slot picker — same component the staff sees */}
+      <SlotPicker
+        ref={pickerRef}
+        clinicId={clinicId}
+        selected={slot}
+        onChange={(s) => {
+          setSlot(s);
+          setConflictHint(null);
+        }}
+        autoSelectNextFree
+        conflictHint={conflictHint}
+        onNotice={(n) => setToast({ tone: "info", ...n })}
+      />
+
       <label className="flex items-start gap-3 cursor-pointer select-none">
         <span
           className={cn(
@@ -182,37 +238,39 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
         </span>
       </label>
 
-      {error && (
-        <Toast
-          tone="error"
-          title="Hold on"
-          description={error}
-          onDismiss={() => setError(null)}
-        />
-      )}
-
-      <Button
-        type="submit"
-        size="lg"
-        block
-        disabled={pending}
-        trailingIcon={!pending && <ArrowRight size={18} />}
-      >
-        {pending ? "Getting your token…" : "Get my token"}
-      </Button>
-
-      {/* Predicted slot preview */}
-      <Card surface="raised" className="p-3 flex items-center gap-3">
-        <Clock size={18} className="text-text-secondary flex-none" />
-        <div className="flex-1 min-w-0">
-          <p className="text-label-md font-semibold text-text-primary">
-            ~ 12 min wait
+      {/* Sticky bottom CTA */}
+      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-5 z-20">
+        {slot && (
+          <p className="text-caption text-text-secondary mb-2 px-1">
+            Your slot:{" "}
+            <span className="font-semibold text-text-primary">
+              {new Date(`${slot.dateIso}T00:00:00`).toLocaleDateString(
+                "en-IN",
+                {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                },
+              )}{" "}
+              · {formatSlotTime(slot.time)}
+            </span>
           </p>
-          <p className="text-caption text-text-tertiary">
-            Live · updates if walk-ins arrive
-          </p>
-        </div>
-      </Card>
+        )}
+        <Button
+          type="button"
+          size="lg"
+          block
+          disabled={pending || !slot}
+          trailingIcon={!pending && slot ? <ArrowRight size={18} /> : undefined}
+          onClick={() => handleSubmit()}
+        >
+          {pending
+            ? "Getting your token…"
+            : slot
+              ? "Get my token"
+              : "Pick a slot to continue"}
+        </Button>
+      </div>
 
       <p className="mt-auto text-caption text-text-tertiary text-center">
         Powered by Saral · Your details are private
