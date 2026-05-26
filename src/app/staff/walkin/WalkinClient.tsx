@@ -154,7 +154,7 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
             disabled={!shareUrl}
             className={cn(
               "inline-flex items-center justify-center gap-2 h-11 px-4 rounded-lg",
-              "bg-[#25D366] text-white text-label-md font-semibold shadow-sm",
+              "bg-surface-brand text-white text-label-md font-semibold",
               "transition-transform active:scale-[0.98]",
               "disabled:opacity-50 disabled:cursor-not-allowed",
             )}

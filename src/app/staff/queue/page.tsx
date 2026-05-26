@@ -664,7 +664,7 @@ function QueueRow({
                   className="w-full flex items-center gap-3 px-3 py-3 text-label-md text-text-primary hover:bg-surface-sunken transition-colors text-left border-t border-border-subtle"
                   role="menuitem"
                 >
-                  <WhatsAppIcon size={16} className="text-[#25D366]" />
+                  <WhatsAppIcon size={16} className="text-text-brand" />
                   Send link on WhatsApp
                 </button>
                 <button

@@ -251,7 +251,7 @@ function ReminderCard({
           aria-label={`Send WhatsApp reminder to ${row.patientName}`}
           className={cn(
             "size-10 rounded-full flex items-center justify-center transition-transform active:scale-90",
-            "bg-[#25D366] text-white shadow-sm",
+            "bg-surface-brand text-white",
           )}
         >
           <WhatsAppIcon size={18} />
