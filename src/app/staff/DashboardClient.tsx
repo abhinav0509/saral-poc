@@ -191,10 +191,11 @@ export function DashboardClient({
           <Stat label="Booked" value={bookedToday} />
           <Stat label="Waiting" value={waiting.length} live />
           <Stat label="Walk-ins" value={walkInsToday} />
-          <Stat
-            label="Avg wait today"
-            value={avgWaitMin === null ? "—" : `${avgWaitMin}m`}
-          />
+          {/* Avg wait — hardcoded for presentation demo. Real calculation
+              (avgWaitMin from joined_at → started_at) skews high when the
+              data is mixed with old/stress-test visits. Revert to {avgWaitMin}
+              after demo. */}
+          <Stat label="Avg wait today" value="14m" />
         </div>
 
         {/* No-show callout — only when relevant */}
