@@ -9,8 +9,11 @@
  * a no-op fetch handler is enough to qualify as installable.
  */
 
-const CACHE_VERSION = "saral-v3";
-const SHELL = ["/", "/staff/queue"];
+const CACHE_VERSION = "saral-v4";
+// Only staff routes are inside the PWA scope. Patient routes (/walkin/*,
+// /v/*) deliberately render in the regular browser so installed staff
+// PWAs don't hijack patient-facing links.
+const SHELL = ["/staff", "/staff/queue"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

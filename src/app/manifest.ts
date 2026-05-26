@@ -14,8 +14,12 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Saral",
     description:
       "Saral is a calm operations layer for small clinics. Walk-ins, live queues, and prescriptions — all in one place.",
-    start_url: "/",
-    scope: "/",
+    // Scope the PWA to /staff only — patient links like /walkin/[code] and
+    // /v/[token] must open in the regular browser, not get hijacked into the
+    // staff PWA. start_url is inside scope so the installed app launches
+    // straight into the staff dashboard.
+    start_url: "/staff",
+    scope: "/staff",
     display: "standalone",
     orientation: "portrait",
     background_color: "#FAF8F4",
