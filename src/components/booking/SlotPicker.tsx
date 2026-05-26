@@ -416,70 +416,73 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Date strip */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between px-1">
-          <label className="text-label-md font-medium text-text-secondary">
-            Pick a date
-          </label>
-          <label className="inline-flex items-center gap-1.5 text-label-sm font-semibold text-text-brand cursor-pointer">
-            <CalendarRange size={14} />
-            Pick date
-            <input
-              type="date"
-              min={isoLocalDate(new Date())}
-              onChange={(e) => {
-                if (!e.target.value) return;
-                setCustomDate(e.target.value);
-                setSelectedDate(e.target.value);
-                onChange(null);
-                setConflictSplits(null);
-                autoSelectedRef.current = false;
-              }}
-              className="sr-only"
-            />
-          </label>
-        </div>
-        <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1">
-          {dateChips.map((d) => {
-            const active = selectedDate === d.iso;
-            return (
-              <button
-                type="button"
-                key={d.iso}
-                onClick={() => {
-                  setSelectedDate(d.iso);
+      {/* Date strip — hidden when daysAhead === 1 (e.g. emergency walk-in,
+          where the patient is here NOW and tomorrow/later is irrelevant) */}
+      {daysAhead > 1 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between px-1">
+            <label className="text-label-md font-medium text-text-secondary">
+              Pick a date
+            </label>
+            <label className="inline-flex items-center gap-1.5 text-label-sm font-semibold text-text-brand cursor-pointer">
+              <CalendarRange size={14} />
+              Pick date
+              <input
+                type="date"
+                min={isoLocalDate(new Date())}
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  setCustomDate(e.target.value);
+                  setSelectedDate(e.target.value);
                   onChange(null);
                   setConflictSplits(null);
                   autoSelectedRef.current = false;
                 }}
-                className={cn(
-                  "flex-none w-[64px] h-[72px] rounded-2xl border flex flex-col items-center justify-center gap-0.5 transition-colors",
-                  active
-                    ? "bg-surface-inverse text-text-inverse border-transparent"
-                    : "bg-surface-canvas border-border-default text-text-primary hover:bg-surface-raised",
-                )}
-                aria-pressed={active}
-              >
-                <span className="text-caption font-medium leading-none">
-                  {d.label}
-                </span>
-                <span className="text-label-lg font-bold tnum leading-tight">
-                  {d.sub.split(" ")[0]}
-                </span>
-                <span
+                className="sr-only"
+              />
+            </label>
+          </div>
+          <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1">
+            {dateChips.map((d) => {
+              const active = selectedDate === d.iso;
+              return (
+                <button
+                  type="button"
+                  key={d.iso}
+                  onClick={() => {
+                    setSelectedDate(d.iso);
+                    onChange(null);
+                    setConflictSplits(null);
+                    autoSelectedRef.current = false;
+                  }}
                   className={cn(
-                    "text-[10px] leading-none",
-                    active ? "text-text-inverse/70" : "text-text-tertiary",
+                    "flex-none w-[64px] h-[72px] rounded-2xl border flex flex-col items-center justify-center gap-0.5 transition-colors",
+                    active
+                      ? "bg-surface-inverse text-text-inverse border-transparent"
+                      : "bg-surface-canvas border-border-default text-text-primary hover:bg-surface-raised",
                   )}
+                  aria-pressed={active}
                 >
-                  {d.sub.split(" ")[1]}
-                </span>
-              </button>
-            );
-          })}
+                  <span className="text-caption font-medium leading-none">
+                    {d.label}
+                  </span>
+                  <span className="text-label-lg font-bold tnum leading-tight">
+                    {d.sub.split(" ")[0]}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] leading-none",
+                      active ? "text-text-inverse/70" : "text-text-tertiary",
+                    )}
+                  >
+                    {d.sub.split(" ")[1]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Three period sections — sections fully past on today are hidden */}
       {(() => {
@@ -499,7 +502,9 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
                 Clinic hours are done for today
               </p>
               <p className="text-body-sm text-text-secondary leading-snug max-w-[260px]">
-                Pick Tomorrow above to see fresh slots from 9 AM.
+                {daysAhead > 1
+                  ? "Pick Tomorrow above to see fresh slots from 9 AM."
+                  : "No more slots today. For after-hours, contact the doctor directly."}
               </p>
             </Card>
           );

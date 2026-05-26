@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Share2,
   X,
+  HeartPulse,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
 import { Input } from "@/components/ui/Input";
@@ -32,6 +33,7 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
   const [pending, startTransition] = useTransition();
   const [shareUrl, setShareUrl] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
+  const [isEmergency, setIsEmergency] = useState(false);
 
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
@@ -53,6 +55,14 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
 
   useEffect(() => {
     setShareUrl(`${window.location.origin}/walkin/${clinic.code}`);
+    // Read ?priority=1 from URL once on mount — emergency mode locks the
+    // picker to today only and pre-fills a reason tag.
+    const isPri =
+      new URLSearchParams(window.location.search).get("priority") === "1";
+    if (isPri) {
+      setIsEmergency(true);
+      setReason((prev) => prev || "Emergency");
+    }
   }, [clinic.code]);
 
   function validate(): string | null {
@@ -123,18 +133,26 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
         >
           <ChevronLeft size={22} className="text-text-primary" />
         </button>
-        <h1 className="flex-1 text-label-lg font-semibold text-text-primary">
-          Add walk-in
+        <h1 className="flex-1 text-label-lg font-semibold text-text-primary inline-flex items-center gap-2">
+          {isEmergency && (
+            <span className="inline-flex items-center gap-1 h-6 px-2 rounded-full bg-sindoor-50 text-text-critical text-label-sm font-semibold">
+              <HeartPulse size={12} strokeWidth={2.4} />
+              Emergency
+            </span>
+          )}
+          {isEmergency ? "Walk-in" : "Add walk-in"}
         </h1>
-        <button
-          type="button"
-          onClick={() => setShareOpen(true)}
-          aria-label="Share self-check-in link"
-          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-label-sm font-semibold text-text-brand hover:bg-surface-sunken transition-colors"
-        >
-          <Share2 size={16} />
-          Share link
-        </button>
+        {!isEmergency && (
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            aria-label="Share self-check-in link"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full text-label-sm font-semibold text-text-brand hover:bg-surface-sunken transition-colors"
+          >
+            <Share2 size={16} />
+            Share link
+          </button>
+        )}
       </header>
 
       <form
@@ -143,8 +161,9 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
       >
         {/* Single-line intro — no card, no tip */}
         <p className="text-body-sm text-text-secondary px-1 mb-6 leading-snug">
-          Fill the patient&apos;s details and pick a time. We auto-pick the
-          next free slot.
+          {isEmergency
+            ? "This walk-in joins the queue right away with priority. Future dates aren't shown — emergencies are for today."
+            : "Fill the patient's details and pick a time. We auto-pick the next free slot."}
         </p>
 
         {/* ─── SECTION 1 · PATIENT ─── */}
@@ -234,6 +253,7 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
               setConflictHint(null);
             }}
             autoSelectNextFree
+            daysAhead={isEmergency ? 1 : 14}
             conflictHint={conflictHint}
             onNotice={(n) => setToast({ tone: "info", ...n })}
           />
@@ -257,16 +277,18 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
       <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto bg-surface-canvas border-t border-border-subtle px-4 pt-3 pb-[max(20px,env(safe-area-inset-bottom))] z-20">
         {slot && (
           <p className="text-caption text-text-secondary mb-2 px-1">
-            Walk-in slot:{" "}
+            {isEmergency ? "Emergency slot: " : "Walk-in slot: "}
             <span className="font-semibold text-text-primary">
-              {new Date(`${slot.dateIso}T00:00:00`).toLocaleDateString(
-                "en-IN",
-                {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                },
-              )}{" "}
+              {isEmergency
+                ? "Today"
+                : new Date(`${slot.dateIso}T00:00:00`).toLocaleDateString(
+                    "en-IN",
+                    {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                    },
+                  )}{" "}
               · {formatSlotTime(slot.time)}
             </span>
           </p>
@@ -283,7 +305,9 @@ export function WalkinClient({ clinic }: { clinic: Clinic }) {
           {pending
             ? "Adding…"
             : slot
-              ? "Add to queue"
+              ? isEmergency
+                ? "Add as emergency"
+                : "Add to queue"
               : "Pick a slot to continue"}
         </Button>
       </div>
