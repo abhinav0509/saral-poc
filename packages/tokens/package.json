@@ -1,0 +1,20 @@
+{
+  "name": "@saral/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./tokens.ts",
+    "./theme.css": "./theme.css",
+    "./data": "./tokens.data.mjs"
+  },
+  "scripts": {
+    "build": "node generate-theme.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

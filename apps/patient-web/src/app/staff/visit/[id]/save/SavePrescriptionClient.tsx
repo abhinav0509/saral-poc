@@ -125,7 +125,12 @@ export function SavePrescriptionClient({
       try {
         let photoUrl: string | null = null;
         if (photoFile) {
-          photoUrl = await uploadPrescriptionPhoto(visit.id, photoFile);
+          // @saral/core takes a platform-neutral payload (no DOM File type).
+          photoUrl = await uploadPrescriptionPhoto(visit.id, {
+            body: await photoFile.arrayBuffer(),
+            fileName: photoFile.name,
+            contentType: photoFile.type || "image/jpeg",
+          });
         }
         await savePrescription({
           visitId: visit.id,

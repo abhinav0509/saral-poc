@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Saral — monorepo
 
-## Getting Started
+Calm clinic-ops for small Indian clinics. _Care, made simple._
 
-First, run the development server:
+This is a **pnpm + Turborepo** workspace. The product is moving from a web PWA to
+native staff apps + a hardened multi-tenant Supabase backend, while patients stay
+on the zero-install mobile web.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Layout
+
+```
+apps/
+  patient-web/     Next.js 16 app — patient mobile-web (/v/[token], /walkin/[code])
+                   and (for now) the staff web screens.
+  staff/           Expo (React Native) staff app — added in a later phase.
+packages/
+  core/            Platform-agnostic data layer + business logic:
+                   db queries/types, Supabase client factory, scheduling (slots,
+                   ETA) and storage helpers. Shared by web, the RN app, and Edge
+                   Functions. Unit-tested with Vitest.
+  tokens/          Design tokens — single source of truth (tokens.data.mjs).
+                   Generates theme.css for Tailwind; a drift test keeps them in sync.
+supabase/          Schema, migrations, and (later) Edge Functions.
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Commands
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm install        # install the whole workspace (uses corepack-pinned pnpm)
+pnpm dev            # run app dev servers
+pnpm build          # build all apps/packages (Turbo)
+pnpm typecheck      # tsc across every package
+pnpm test           # Vitest across packages
+pnpm lint           # eslint (currently surfaces pre-existing web debt)
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Per-package: `pnpm --filter @saral/core test`, `pnpm --filter @saral/tokens build`, etc.
 
-## Learn More
+## Conventions
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Tokens are generated.** Edit `packages/tokens/tokens.data.mjs`, then
+  `pnpm --filter @saral/tokens build`. Never hand-edit token values in CSS.
+- **Data access goes through `@saral/core`.** Apps register a Supabase client at
+  startup (`configureSaral` / `setSaralClient`); core never reads env or touches
+  the DOM, so it is safe in React Native.
+- Node 20+. Package manager is pinned via `packageManager` in the root
+  `package.json` (corepack).

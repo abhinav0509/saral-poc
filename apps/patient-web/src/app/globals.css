@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+/* Design tokens — single source of truth lives in @saral/tokens, generated
+   from packages/tokens/tokens.data.mjs. Do NOT hand-edit token values; run
+   `pnpm --filter @saral/tokens build` after changing the source. */
+@import "@saral/tokens/theme.css";
+
+/* ============================================================
+   GLOBAL · base styles
+   ============================================================ */
+
+html, body {
+  height: 100%;
+  background: var(--color-surface-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.font-hindi {
+  font-family: var(--font-hindi);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--color-primary-100);
+  color: var(--color-primary-900);
+}
+
+/* Default focus ring for buttons / links / icon-buttons / chips.
+   Form fields are excluded — they manage their own focus via their
+   wrapper, since a tiny radius outline inside a large-radius pill
+   reads as "border inside the input" instead of a halo around it. */
+*:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+/* ============================================================
+   ANIMATIONS · used by toasts, sheets, menus, etc.
+   ============================================================ */
+
+@keyframes saral-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes saral-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes saral-slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes saral-slide-in-bottom {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes saral-zoom-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-in {
+  animation-duration: var(--duration-default);
+  animation-timing-function: var(--ease-enter);
+  animation-fill-mode: both;
+}
+.fade-in     { animation-name: saral-fade-in; }
+.slide-in-from-top-2 {
+  animation-name: saral-slide-down;
+}
+.slide-in-from-bottom {
+  animation-name: saral-slide-in-bottom;
+  animation-duration: var(--duration-slow);
+}
+.zoom-in-95  { animation-name: saral-zoom-in; }
+
+.duration-150 { animation-duration: 150ms; }
+.duration-200 { animation-duration: 200ms; }
+.duration-300 { animation-duration: 300ms; }
+.ease-out    { animation-timing-function: var(--ease-exit); }

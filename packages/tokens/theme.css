@@ -1,0 +1,167 @@
+/* ============================================================
+   SARAL · DESIGN TOKENS  (generated — do not edit by hand)
+   Source: packages/tokens/tokens.data.mjs
+   Regenerate: pnpm --filter @saral/tokens build
+   ============================================================ */
+
+@theme {
+  /* ---------- COLOR · PRIMITIVES ---------- */
+  --color-primary-50: #E8F4F3;
+  --color-primary-100: #C7E4E2;
+  --color-primary-200: #8FC9C5;
+  --color-primary-300: #5EAEA8;
+  --color-primary-400: #2E938B;
+  --color-primary-500: #0E5E5A;
+  --color-primary-600: #0B4B48;
+  --color-primary-700: #093937;
+  --color-primary-800: #062826;
+  --color-primary-900: #041716;
+  --color-primary-950: #021110;
+
+  --color-accent-50: #FBF1EA;
+  --color-accent-100: #F7E0D0;
+  --color-accent-200: #EFC1A1;
+  --color-accent-300: #E7A172;
+  --color-accent-400: #DF8B53;
+  --color-accent-500: #D97A3C;
+  --color-accent-600: #B65D26;
+  --color-accent-700: #93491D;
+  --color-accent-800: #6F3514;
+  --color-accent-900: #4B240C;
+
+  --color-neutral-0: #FAF8F4;
+  --color-neutral-50: #F3F1ED;
+  --color-neutral-100: #E6E2DA;
+  --color-neutral-200: #D6D2C9;
+  --color-neutral-300: #B8B4AB;
+  --color-neutral-400: #8B8780;
+  --color-neutral-500: #6E6A64;
+  --color-neutral-600: #5A6168;
+  --color-neutral-700: #41464A;
+  --color-neutral-800: #2A2D30;
+  --color-neutral-900: #1A1C1E;
+  --color-neutral-950: #0F1419;
+
+  --color-sage-50: #ECF4F0;
+  --color-sage-100: #D2E6DC;
+  --color-sage-200: #A5CDB9;
+  --color-sage-300: #79B496;
+  --color-sage-400: #5BA487;
+  --color-sage-500: #4A9B7F;
+  --color-sage-600: #3D8068;
+  --color-sage-700: #2F6451;
+  --color-sage-800: #214839;
+  --color-sage-900: #122B22;
+
+  --color-amber-50: #FAF1E0;
+  --color-amber-100: #F4DFB6;
+  --color-amber-200: #E9C273;
+  --color-amber-300: #DEA52F;
+  --color-amber-400: #C9881B;
+  --color-amber-500: #B8740F;
+  --color-amber-600: #98610C;
+  --color-amber-700: #784E0A;
+  --color-amber-800: #583807;
+  --color-amber-900: #382503;
+
+  --color-sindoor-50: #F7E5E8;
+  --color-sindoor-100: #EDC1C7;
+  --color-sindoor-200: #DA8D97;
+  --color-sindoor-300: #C75C68;
+  --color-sindoor-400: #BC4753;
+  --color-sindoor-500: #B23A48;
+  --color-sindoor-600: #92303B;
+  --color-sindoor-700: #74262F;
+  --color-sindoor-800: #561C23;
+  --color-sindoor-900: #381217;
+
+  /* ---------- COLOR · SEMANTIC ALIASES ---------- */
+  --color-surface-canvas: var(--color-neutral-0);
+  --color-surface-raised: var(--color-neutral-50);
+  --color-surface-sunken: var(--color-neutral-100);
+  --color-surface-inverse: var(--color-neutral-950);
+  --color-surface-brand: var(--color-primary-500);
+  --color-surface-brand-subtle: var(--color-primary-50);
+  --color-surface-accent-subtle: var(--color-accent-50);
+
+  --color-text-primary: var(--color-neutral-950);
+  --color-text-secondary: var(--color-neutral-600);
+  --color-text-tertiary: var(--color-neutral-400);
+  --color-text-inverse: #FFFFFF;
+  --color-text-brand: var(--color-primary-500);
+  --color-text-accent: var(--color-accent-600);
+  --color-text-success: var(--color-sage-700);
+  --color-text-warning: var(--color-amber-700);
+  --color-text-critical: var(--color-sindoor-600);
+
+  --color-border-subtle: var(--color-neutral-100);
+  --color-border-default: var(--color-neutral-200);
+  --color-border-strong: var(--color-neutral-400);
+  --color-border-focus: var(--color-primary-500);
+  --color-border-brand: var(--color-primary-500);
+  --color-border-critical: var(--color-sindoor-500);
+
+  /* ---------- RADIUS ---------- */
+  --radius-none: 0;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* ---------- FONTS ---------- */
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-hindi: var(--font-mukta), var(--font-inter), sans-serif;
+
+  /* ---------- TYPE ROLES ---------- */
+  --text-display-lg: 3rem;
+  --text-display-md: 2.25rem;
+  --text-h1: 2rem;
+  --text-h2: 1.5rem;
+  --text-h3: 1.25rem;
+  --text-h4: 1.125rem;
+  --text-body-lg: 1rem;
+  --text-body-md: 0.875rem;
+  --text-body-sm: 0.75rem;
+  --text-label-lg: 0.875rem;
+  --text-label-md: 0.75rem;
+  --text-label-sm: 0.6875rem;
+  --text-caption: 0.6875rem;
+
+  --text-display-lg--line-height: 3.5rem;
+  --text-display-md--line-height: 2.75rem;
+  --text-h1--line-height: 2.5rem;
+  --text-h2--line-height: 2rem;
+  --text-h3--line-height: 1.75rem;
+  --text-h4--line-height: 1.625rem;
+  --text-body-lg--line-height: 1.5rem;
+  --text-body-md--line-height: 1.25rem;
+  --text-body-sm--line-height: 1.125rem;
+  --text-label-lg--line-height: 1.25rem;
+  --text-label-md--line-height: 1rem;
+  --text-label-sm--line-height: 0.875rem;
+  --text-caption--line-height: 0.875rem;
+
+  --text-display-lg--letter-spacing: -0.03em;
+  --text-display-md--letter-spacing: -0.02em;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h4--letter-spacing: -0.005em;
+
+  /* ---------- MOTION ---------- */
+  --duration-fast: 120ms;
+  --duration-default: 200ms;
+  --duration-slow: 320ms;
+  --duration-reveal: 480ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1.2);
+
+  /* ---------- ELEVATION ---------- */
+  --shadow-sm: 0 1px 2px rgba(15, 20, 25, 0.04), 0 1px 3px rgba(15, 20, 25, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(15, 20, 25, 0.06), 0 2px 4px -2px rgba(15, 20, 25, 0.08);
+  --shadow-lg: 0 12px 16px -4px rgba(15, 20, 25, 0.08), 0 4px 8px -2px rgba(15, 20, 25, 0.10);
+}

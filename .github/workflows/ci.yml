@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm/action-setup reads the version from package.json "packageManager".
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Gates — these must pass.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+        env:
+          # Placeholders so the build never depends on real secrets. The data
+          # layer is lazy (configureSaral), so these are not actually used during
+          # static generation — they only satisfy any accidental eager reads.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
+
+      # Non-blocking for now: surfaces pre-existing React-hooks lint debt in the
+      # patient-web screens (predates the monorepo migration). Burn down as
+      # screens are hardened / re-authored, then flip continue-on-error off.
+      - name: Lint (non-blocking)
+        run: pnpm lint
+        continue-on-error: true

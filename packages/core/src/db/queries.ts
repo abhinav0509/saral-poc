@@ -1,4 +1,5 @@
 import { getSupabase } from "./client";
+import { minutesForAhead } from "../scheduling/eta";
 import type {
   Clinic,
   Visit,
@@ -293,7 +294,7 @@ export async function getQueueContext(visit: Visit): Promise<{
     .sort((a, b) => a.joined_at.localeCompare(b.joined_at));
   const idx = ordered.findIndex((v) => v.id === visit.id);
   const aheadCount = visit.status === "now_serving" ? 0 : Math.max(0, idx);
-  const etaMinutes = aheadCount * 6;
+  const etaMinutes = minutesForAhead(aheadCount);
   return { aheadCount, etaMinutes, queue };
 }
 
@@ -633,19 +634,4 @@ export async function delayQueue(
     updated.push(data as Visit);
   }
   return { shifted: updated.length, visits: updated };
-}
-
-export async function uploadPrescriptionPhoto(
-  visitId: string,
-  file: File | Blob,
-): Promise<string> {
-  const ext =
-    (file as File).name?.split(".").pop()?.toLowerCase() ?? "jpg";
-  const path = `${visitId}/${Date.now()}.${ext}`;
-  const { error } = await getSupabase()
-    .storage.from("prescriptions")
-    .upload(path, file, { contentType: (file as File).type || "image/jpeg" });
-  if (error) throw error;
-  const { data } = getSupabase().storage.from("prescriptions").getPublicUrl(path);
-  return data.publicUrl;
 }
