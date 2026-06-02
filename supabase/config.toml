@@ -1,0 +1,50 @@
+# Supabase CLI project config. Run `supabase start` (needs Docker) for a local
+# stack, `supabase db reset` to rebuild from migrations + seed, and
+# `supabase test db` to run the pgTAP tests under supabase/tests/.
+project_id = "saral"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = true
+port = 54329
+pool_mode = "transaction"
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
+enabled = true
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+enable_signup = true
+
+# Phone OTP is the staff sign-in method (India). Provider/credentials are
+# configured per-environment (e.g. MSG91/Twilio) in the hosted project.
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+
+[studio]
+enabled = true
+port = 54323
