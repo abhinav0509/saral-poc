@@ -128,10 +128,22 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+-- Creating a trigger on auth.users requires ownership of that table
+-- (supabase_auth_admin). The SQL editor's role may lack it, so make this
+-- non-fatal — the trigger is only needed once phone-OTP auth is wired (P2),
+-- not for the patient flow. If it's skipped here, create it later as the
+-- auth admin (or via the Supabase dashboard Auth hooks).
+DO $$ BEGIN
+  DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+  CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE '[saral] Skipped on_auth_user_created trigger — insufficient privilege on auth.users. Create it later as supabase_auth_admin.';
+  WHEN others THEN
+    RAISE NOTICE '[saral] Skipped on_auth_user_created trigger: %', SQLERRM;
+END $$;
 
 -- ============================================================
 -- RLS · new tables only (authenticated). anon has no policy here,
