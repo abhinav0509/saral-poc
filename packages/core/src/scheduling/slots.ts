@@ -117,6 +117,21 @@ export function buildBookedMap(
   return { takenSlots, blockedSlots, takenOffsets, blockReason };
 }
 
+/**
+ * Build a BookedMap from the anon `get_slot_availability` RPC payload (raw
+ * booked timestamps + doctor blocks). Lets the patient slot picker reuse the
+ * exact same conflict logic as staff without direct table access.
+ */
+export function buildBookedMapFromRaw(
+  bookings: string[],
+  blocks: { starts_at: string; ends_at: string; kind: string; title: string }[],
+  isoDate: string,
+): BookedMap {
+  const visitLike = bookings.map((iso) => ({ booked_for: iso })) as unknown as Visit[];
+  const blockLike = blocks as unknown as ClinicBlock[];
+  return buildBookedMap(visitLike, blockLike, isoDate);
+}
+
 export function suggestSplits(takenTime: string, map: BookedMap): string[] {
   const [h, m] = takenTime.split(":").map(Number);
   const candidates = [

@@ -255,7 +255,7 @@ export default function StaffQueuePage() {
       });
       return;
     }
-    const url = `${window.location.origin}/v/${encodeURIComponent(v.token)}`;
+    const url = `${window.location.origin}/v/${encodeURIComponent(v.public_token)}`;
     const msg = `Your live visit link at Dr. Mehta's Clinic — track your queue position here: ${url}`;
     const cleaned = v.mobile.replace(/^\+?91/, "").replace(/\D/g, "");
     const intl = `91${cleaned}`;

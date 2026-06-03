@@ -13,6 +13,7 @@ function makeVisit(p: Partial<Visit> & Pick<Visit, "id">): Visit {
   return {
     clinic_id: "c1",
     token: "T-01",
+    public_token: "00000000-0000-0000-0000-000000000000",
     patient_name: "Test",
     age: null,
     gender: null,

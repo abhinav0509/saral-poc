@@ -13,7 +13,7 @@ import { Sun, Sunset, Moon, CalendarRange, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { getBookingsForDate, getBlocksForDate } from "@/lib/db/queries";
 import { getSupabase } from "@/lib/db/client";
-import type { Visit, ClinicBlock } from "@/lib/db/types";
+import type { ClinicBlock } from "@/lib/db/types";
 import {
   MORNING_SLOTS,
   AFTERNOON_SLOTS,
@@ -23,6 +23,8 @@ import {
   isoLocalDate,
   combineDateTime,
   buildBookedMap,
+  buildBookedMapFromRaw,
+  getSlotAvailability,
   suggestSplits,
   buildDateStrip,
   type BaseSlot,
@@ -47,7 +49,12 @@ export interface SlotPickerHandle {
 }
 
 interface Props {
-  clinicId: string;
+  /** "staff" (authenticated, direct reads + realtime) or "public" (anon RPC + poll). */
+  mode?: "staff" | "public";
+  /** Required in staff mode. */
+  clinicId?: string;
+  /** Required in public mode (patient self-check-in by clinic code). */
+  clinicCode?: string;
   selected: SlotSelection | null;
   onChange: (sel: SlotSelection | null) => void;
   /** Default-pick the next free slot ≥ now when the picker mounts */
@@ -64,7 +71,9 @@ interface Props {
 
 export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicker(
   {
+    mode = "staff",
     clinicId,
+    clinicCode,
     selected,
     onChange,
     autoSelectNextFree,
@@ -81,8 +90,12 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
   );
   const [customDate, setCustomDate] = useState<string | null>(null);
 
-  const [bookings, setBookings] = useState<Visit[]>([]);
-  const [blocks, setBlocks] = useState<ClinicBlock[]>([]);
+  const [bookedMap, setBookedMap] = useState<BookedMap>(() => ({
+    takenSlots: new Set(),
+    blockedSlots: new Set(),
+    takenOffsets: new Set(),
+    blockReason: new Map(),
+  }));
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [now, setNow] = useState(() => new Date());
 
@@ -92,29 +105,33 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
     return () => clearInterval(t);
   }, []);
 
-  // Load + realtime sync
+  // Load availability — staff reads tables directly; patients (anon) go through
+  // the get_slot_availability RPC so they never touch the tables.
   const loadAvailability = useCallback(async () => {
     try {
       setLoadingSlots(true);
-      const bookingRows = await getBookingsForDate(clinicId, selectedDate);
-      setBookings(bookingRows);
-      // Blocks table is optional — slot picker still works without it
-      try {
-        const blockRows = await getBlocksForDate(clinicId, selectedDate);
-        setBlocks(blockRows);
-      } catch (blkErr) {
-        console.warn(
-          "[slot-picker] blocks unavailable — run migration 0002",
-          blkErr,
+      if (mode === "public") {
+        const raw = await getSlotAvailability(clinicCode ?? "", selectedDate);
+        setBookedMap(
+          buildBookedMapFromRaw(raw?.bookings ?? [], raw?.blocks ?? [], selectedDate),
         );
-        setBlocks([]);
+      } else {
+        const bookingRows = await getBookingsForDate(clinicId ?? "", selectedDate);
+        let blockRows: ClinicBlock[] = [];
+        try {
+          blockRows = await getBlocksForDate(clinicId ?? "", selectedDate);
+        } catch (blkErr) {
+          // Blocks table is optional — slot picker still works without it.
+          console.warn("[slot-picker] blocks unavailable — run migration 0002", blkErr);
+        }
+        setBookedMap(buildBookedMap(bookingRows, blockRows, selectedDate));
       }
     } catch (e) {
       console.error("[slot-picker] load failed", e);
     } finally {
       setLoadingSlots(false);
     }
-  }, [clinicId, selectedDate]);
+  }, [mode, clinicId, clinicCode, selectedDate]);
 
   useEffect(() => {
     void loadAvailability();
@@ -124,39 +141,30 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
     loadAvailability,
   ]);
 
+  // Staff get instant Postgres realtime; patients (anon — no clinic_id in scope,
+  // and no direct table access after the RLS flip) poll the RPC instead.
   useEffect(() => {
+    if (mode === "public") {
+      const t = setInterval(() => void loadAvailability(), 20_000);
+      return () => clearInterval(t);
+    }
     const channel = getSupabase()
       .channel(`slots:${clinicId}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "visits",
-          filter: `clinic_id=eq.${clinicId}`,
-        },
+        { event: "*", schema: "public", table: "visits", filter: `clinic_id=eq.${clinicId}` },
         () => void loadAvailability(),
       )
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "clinic_blocks",
-          filter: `clinic_id=eq.${clinicId}`,
-        },
+        { event: "*", schema: "public", table: "clinic_blocks", filter: `clinic_id=eq.${clinicId}` },
         () => void loadAvailability(),
       )
       .subscribe();
     return () => {
       void channel.unsubscribe();
     };
-  }, [clinicId, loadAvailability]);
-
-  const bookedMap = useMemo(
-    () => buildBookedMap(bookings, blocks, selectedDate),
-    [bookings, blocks, selectedDate],
-  );
+  }, [mode, clinicId, loadAvailability]);
 
   const isToday = selectedDate === dateStrip[0].iso;
   const nowMinutes = isToday ? now.getHours() * 60 + now.getMinutes() : -1;

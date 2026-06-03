@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import { getVisitByToken } from "@/lib/db/queries";
-import { getSupabase } from "@/lib/db/client";
+import { getVisitPublic } from "@/lib/db/queries";
 import { VisitClient } from "./VisitClient";
 
 interface VisitPageProps {
+  // The [token] segment carries the opaque public_token (a uuid), not T-NN.
   params: Promise<{ token: string }>;
 }
 
@@ -11,25 +11,16 @@ export const dynamic = "force-dynamic";
 
 export default async function VisitPage({ params }: VisitPageProps) {
   const { token } = await params;
-  const decoded = decodeURIComponent(token);
+  const publicToken = decodeURIComponent(token);
 
-  let visit;
+  let view;
   try {
-    visit = await getVisitByToken(decoded);
+    view = await getVisitPublic(publicToken);
   } catch (e) {
     console.error("[visit] lookup failed", e);
-    visit = null;
+    view = null;
   }
-  if (!visit) notFound();
+  if (!view) notFound();
 
-  // Look up clinic for header info (parallel-friendly later)
-  const { data: clinicRow } = await getSupabase()
-    .from("clinics")
-    .select("*")
-    .eq("id", visit.clinic_id)
-    .maybeSingle();
-
-  if (!clinicRow) notFound();
-
-  return <VisitClient initialVisit={visit} clinic={clinicRow} />;
+  return <VisitClient initialView={view} />;
 }

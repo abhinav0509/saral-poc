@@ -18,6 +18,7 @@ function booking(timeHHMM: string, isoDate = "2026-06-02"): Visit {
     id: `v-${timeHHMM}`,
     clinic_id: "c1",
     token: "T-01",
+    public_token: `pt-${timeHHMM}`,
     patient_name: "P",
     age: null,
     gender: null,

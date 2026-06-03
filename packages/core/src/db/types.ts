@@ -19,6 +19,8 @@ export interface Visit {
   id: string;
   clinic_id: string;
   token: string;
+  /** Opaque, unguessable key used in patient /v/[public_token] URLs. */
+  public_token: string;
   patient_name: string;
   age: number | null;
   gender: string | null;

@@ -16,58 +16,55 @@ import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { BrowserChrome } from "@/components/patient/BrowserChrome";
-import { cancelVisit, getQueueContext, getPrescriptionForVisit, getVisitByToken } from "@/lib/db/queries";
+import { getVisitPublic, cancelVisitPublic } from "@/lib/db/queries";
 import { getSupabase } from "@/lib/db/client";
-import type { Clinic, Visit, Prescription } from "@/lib/db/types";
+import type {
+  PublicVisitView,
+  PublicVisit,
+  PublicClinic,
+  PublicPrescription,
+} from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
 interface VisitClientProps {
-  initialVisit: Visit;
-  clinic: Clinic;
+  initialView: PublicVisitView;
 }
 
-// Polling as a safety net only — realtime is the primary update mechanism
+// Polling as a safety net only — realtime is the primary update mechanism.
+// (Patient realtime moves to Supabase Broadcast when the RLS flip lands in P2;
+// until then anon postgres_changes still works under the permissive policy.)
 const POLL_INTERVAL_MS = 30000;
 
-export function VisitClient({ initialVisit, clinic }: VisitClientProps) {
-  const [visit, setVisit] = useState(initialVisit);
-  const [aheadCount, setAheadCount] = useState(0);
-  const [etaMinutes, setEtaMinutes] = useState(0);
-  const [miniQueue, setMiniQueue] = useState<Visit[]>([]);
-  const [prescription, setPrescription] = useState<Prescription | null>(null);
+export function VisitClient({ initialView }: VisitClientProps) {
+  const [view, setView] = useState(initialView);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [cancelling, startCancel] = useTransition();
 
+  const visit = view.visit;
+  const clinic = view.clinic;
+  const aheadCount = view.ahead_count;
+  const etaMinutes = view.eta_minutes;
+  const miniQueue = view.mini_queue;
+  const prescription = view.prescription;
+
   async function refresh() {
     try {
-      const fresh = await getVisitByToken(visit.token);
-      if (!fresh) return;
-      setVisit(fresh);
-      const ctx = await getQueueContext(fresh);
-      setAheadCount(ctx.aheadCount);
-      setEtaMinutes(ctx.etaMinutes);
-      setMiniQueue(buildMiniQueue(ctx.queue, fresh));
-      if (fresh.status === "done") {
-        const rx = await getPrescriptionForVisit(fresh.id);
-        setPrescription(rx);
-      }
+      const fresh = await getVisitPublic(visit.public_token);
+      if (fresh) setView(fresh);
     } catch (e) {
       console.error("[visit] refresh failed", e);
     }
   }
 
-  // Initial load + slow poll as a safety net
+  // Initial poll as a safety net.
   useEffect(() => {
-    refresh();
     const t = setInterval(refresh, POLL_INTERVAL_MS);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visit.token]);
+  }, [visit.public_token]);
 
-  // Realtime: refresh on ANY visit row change in our clinic.
-  // This is what makes the patient page update instantly when staff
-  // calls them in or saves their prescription.
+  // Realtime: refresh on any visit change in our clinic, or our prescription.
   useEffect(() => {
     const channel = getSupabase()
       .channel(`patient:${visit.clinic_id}`)
@@ -102,8 +99,8 @@ export function VisitClient({ initialVisit, clinic }: VisitClientProps) {
     setConfirmingCancel(false);
     startCancel(async () => {
       try {
-        const updated = await cancelVisit(visit.id);
-        setVisit(updated);
+        await cancelVisitPublic(visit.public_token);
+        await refresh();
       } catch (e) {
         const m = e instanceof Error ? e.message : "Couldn't cancel";
         setErrorMsg(m);
@@ -112,7 +109,7 @@ export function VisitClient({ initialVisit, clinic }: VisitClientProps) {
   }
 
   // --------------------------------------------------------
-  // Visit complete state — show prescription instead of queue
+  // Visit complete — show prescription instead of the queue
   // --------------------------------------------------------
   if (visit.status === "done") {
     return (
@@ -121,12 +118,10 @@ export function VisitClient({ initialVisit, clinic }: VisitClientProps) {
   }
 
   // --------------------------------------------------------
-  // Visit dropped state — apology + book again
+  // Visit dropped — apology + book again
   // --------------------------------------------------------
   if (visit.status === "dropped") {
-    return (
-      <DroppedView clinic={clinic} />
-    );
+    return <DroppedView clinic={clinic} />;
   }
 
   // --------------------------------------------------------
@@ -201,8 +196,10 @@ export function VisitClient({ initialVisit, clinic }: VisitClientProps) {
           >
             {isServing ? "You're with the doctor" : "Your token"}
           </p>
-          <p className="mt-2 text-center font-bold tnum text-text-inverse leading-none"
-             style={{ fontSize: "4rem" }}>
+          <p
+            className="mt-2 text-center font-bold tnum text-text-inverse leading-none"
+            style={{ fontSize: "4rem" }}
+          >
             {visit.token}
           </p>
 
@@ -227,12 +224,12 @@ export function VisitClient({ initialVisit, clinic }: VisitClientProps) {
           {/* Mini queue strip */}
           {!isServing && miniQueue.length > 0 && (
             <div className="mt-5 flex items-center justify-center gap-1.5">
-              {miniQueue.map((entry) => {
-                const isYou = entry.id === visit.id;
-                const isNow = entry.status === "now_serving";
+              {miniQueue.map((entry, i) => {
+                const isYou = entry.kind === "you";
+                const isNow = entry.kind === "now";
                 return (
                   <div
-                    key={entry.id}
+                    key={`${entry.token}-${i}`}
                     className={cn(
                       "h-11 px-2.5 min-w-[56px] flex flex-col items-center justify-center rounded-md",
                       isYou
@@ -248,9 +245,7 @@ export function VisitClient({ initialVisit, clinic }: VisitClientProps) {
                     <span
                       className={cn(
                         "mt-0.5 text-[10px] leading-none",
-                        isYou
-                          ? "text-text-secondary"
-                          : "text-text-inverse/50",
+                        isYou ? "text-text-secondary" : "text-text-inverse/50",
                       )}
                     >
                       {isYou ? "you" : isNow ? "now" : ""}
@@ -352,19 +347,6 @@ export function VisitClient({ initialVisit, clinic }: VisitClientProps) {
 }
 
 /* ------------------------------------------------------------
-   Helpers
-   ------------------------------------------------------------ */
-
-function buildMiniQueue(queue: Visit[], me: Visit): Visit[] {
-  const sorted = [...queue].sort((a, b) => a.joined_at.localeCompare(b.joined_at));
-  const idx = sorted.findIndex((v) => v.id === me.id);
-  if (idx < 0) return sorted.slice(0, 5);
-  // Show me + up to 2 before + 2 after; pad to 5 from either side
-  const start = Math.max(0, Math.min(idx - 2, sorted.length - 5));
-  return sorted.slice(start, start + 5);
-}
-
-/* ------------------------------------------------------------
    Cancel confirmation bottom sheet
    ------------------------------------------------------------ */
 
@@ -425,9 +407,9 @@ function PostVisitView({
   clinic,
   prescription,
 }: {
-  visit: Visit;
-  clinic: Clinic;
-  prescription: Prescription | null;
+  visit: PublicVisit;
+  clinic: PublicClinic;
+  prescription: PublicPrescription | null;
 }) {
   return (
     <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas">
@@ -460,9 +442,7 @@ function PostVisitView({
           Your prescription
         </p>
         {prescription?.photo_url && (
-          <span className="text-caption text-text-tertiary">
-            Tap to enlarge
-          </span>
+          <span className="text-caption text-text-tertiary">Tap to enlarge</span>
         )}
       </div>
 
@@ -576,7 +556,7 @@ function PostVisitView({
    Dropped state — patient cancelled or receptionist dropped
    ------------------------------------------------------------ */
 
-function DroppedView({ clinic }: { clinic: Clinic }) {
+function DroppedView({ clinic }: { clinic: PublicClinic }) {
   return (
     <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas">
       <BrowserChrome url={`saral.live / ${clinic.code}`} />

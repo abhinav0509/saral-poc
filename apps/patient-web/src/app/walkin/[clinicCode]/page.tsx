@@ -3,7 +3,7 @@ import { MapPin } from "lucide-react";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { BrowserChrome } from "@/components/patient/BrowserChrome";
 import { CheckinForm } from "./CheckinForm";
-import { getClinicByCode } from "@/lib/db/queries";
+import { getClinicPublic } from "@/lib/db/queries";
 
 interface WalkinPageProps {
   params: Promise<{ clinicCode: string }>;
@@ -16,7 +16,7 @@ export default async function WalkinPage({ params }: WalkinPageProps) {
 
   let clinic;
   try {
-    clinic = await getClinicByCode(clinicCode);
+    clinic = await getClinicPublic(clinicCode);
   } catch (e) {
     console.error("[walkin] clinic lookup failed", e);
     clinic = null;
@@ -46,7 +46,7 @@ export default async function WalkinPage({ params }: WalkinPageProps) {
         </div>
       </header>
 
-      <CheckinForm clinicId={clinic.id} clinicCode={clinic.code} />
+      <CheckinForm clinicCode={clinic.code} />
     </main>
   );
 }

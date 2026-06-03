@@ -84,6 +84,8 @@ BEGIN
 
   RETURN jsonb_build_object(
     'visit', jsonb_build_object(
+      'id', v.id,
+      'clinic_id', v.clinic_id,
       'public_token', v.public_token,
       'token', v.token,
       'patient_name', v.patient_name,

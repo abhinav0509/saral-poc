@@ -13,17 +13,16 @@ import {
   type SlotPickerHandle,
   type SlotSelection,
 } from "@/components/booking/SlotPicker";
-import { createBooking, SlotConflictError } from "@/lib/db/queries";
+import { createSelfCheckin, SlotConflictError } from "@/lib/db/queries";
 import { cn } from "@/lib/utils";
 
 type Gender = "Female" | "Male" | "Other";
 
 interface CheckinFormProps {
-  clinicId: string;
   clinicCode: string;
 }
 
-export function CheckinForm({ clinicId }: CheckinFormProps) {
+export function CheckinForm({ clinicCode }: CheckinFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -72,17 +71,16 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
           slot!.dateIso,
           slot!.time,
         ).toISOString();
-        const visit = await createBooking({
-          clinicId,
+        const result = await createSelfCheckin({
+          clinicCode,
           patientName: name.trim(),
           age: parseInt(age, 10),
           gender,
           mobile: mobile.replace(/\D/g, "").slice(-10),
-          source: "qr",
           reason: reason.trim() || null,
           bookedFor,
         });
-        router.push(`/v/${encodeURIComponent(visit.token)}`);
+        router.push(`/v/${encodeURIComponent(result.public_token)}`);
       } catch (err: unknown) {
         if (err instanceof SlotConflictError) {
           const takenTime = slot!.time;
@@ -196,7 +194,8 @@ export function CheckinForm({ clinicId }: CheckinFormProps) {
         <SectionHeading>Choose a time</SectionHeading>
         <SlotPicker
           ref={pickerRef}
-          clinicId={clinicId}
+          mode="public"
+          clinicCode={clinicCode}
           selected={slot}
           onChange={(s) => {
             setSlot(s);
