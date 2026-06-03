@@ -14,6 +14,34 @@ ALTER TABLE visits ALTER COLUMN public_token SET DEFAULT gen_random_uuid();
 ALTER TABLE visits ALTER COLUMN public_token SET NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS visits_public_token_idx ON visits(public_token);
 
+-- ---------- service_date (materialised IST day for per-day token uniqueness) ----------
+-- A timestamptz -> date cast is only STABLE (timezone-dependent), so it cannot
+-- live in an index expression. We materialise the IST calendar day in a column
+-- via a BEFORE INSERT trigger and build the unique index on plain columns.
+ALTER TABLE visits ADD COLUMN IF NOT EXISTS service_date date;
+UPDATE visits
+SET service_date = (created_at AT TIME ZONE 'Asia/Kolkata')::date
+WHERE service_date IS NULL;
+
+CREATE OR REPLACE FUNCTION set_visit_service_date()
+  RETURNS trigger
+  LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.service_date IS NULL THEN
+    NEW.service_date := (coalesce(NEW.created_at, now()) AT TIME ZONE 'Asia/Kolkata')::date;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS visits_set_service_date ON visits;
+CREATE TRIGGER visits_set_service_date
+  BEFORE INSERT ON visits
+  FOR EACH ROW EXECUTE FUNCTION set_visit_service_date();
+
+ALTER TABLE visits ALTER COLUMN service_date SET NOT NULL;
+
 -- ---------- prescriptions.clinic_id (denormalised for RLS + queries) ----------
 ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS clinic_id uuid REFERENCES clinics(id) ON DELETE CASCADE;
 
@@ -60,7 +88,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS visits_unique_slot_idx
 
 -- Token is a per-day counter, so it must be unique per clinic per IST day.
 CREATE UNIQUE INDEX IF NOT EXISTS visits_token_per_day_idx
-  ON visits(clinic_id, token, ((created_at AT TIME ZONE 'Asia/Kolkata')::date));
+  ON visits(clinic_id, token, service_date);
 
 -- ============================================================
 -- Read-path indexes (booking / calendar / today / search / reminders).
