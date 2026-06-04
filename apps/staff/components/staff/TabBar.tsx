@@ -1,19 +1,21 @@
 import { View, Text, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { Users, Search, Calendar, MoreHorizontal, type LucideIcon } from "lucide-react-native";
+import { Home, Users, Search, Calendar, MoreHorizontal, type LucideIcon } from "lucide-react-native";
 import { palette } from "@/lib/colors";
 import { haptics } from "@/lib/haptics";
 import { cn } from "@/lib/cn";
 
 const ICONS: Record<string, LucideIcon> = {
-  index: Users,
+  index: Home,
+  queue: Users,
   search: Search,
   calendar: Calendar,
   more: MoreHorizontal,
 };
 const LABELS: Record<string, string> = {
-  index: "Queue",
+  index: "Home",
+  queue: "Queue",
   search: "Search",
   calendar: "Calendar",
   more: "More",

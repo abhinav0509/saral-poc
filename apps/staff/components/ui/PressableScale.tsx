@@ -1,6 +1,20 @@
 import { useRef } from "react";
-import { Animated, Pressable, type PressableProps } from "react-native";
+import {
+  Animated,
+  Pressable,
+  type PressableProps,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
+import { cssInterop } from "nativewind";
 import { haptics } from "@/lib/haptics";
+
+// A single animated Pressable so NativeWind's className (flex-1, w-full, bg,
+// padding…) applies directly to the touch target — no wrapper that would
+// swallow layout. cssInterop maps className → style; the animated scale rides
+// alongside in the style prop.
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+cssInterop(AnimatedPressable, { className: "style" });
 
 type HapticKind = keyof typeof haptics;
 
@@ -10,15 +24,10 @@ interface Props extends Omit<PressableProps, "style"> {
   scaleTo?: number;
   /** Haptic on press (null to disable). "light" by default. */
   haptic?: HapticKind | null;
-  /** Style on the animated wrapper (rarely needed). */
-  style?: PressableProps["style"];
+  /** Extra static style, merged with the animated transform. */
+  style?: StyleProp<ViewStyle>;
 }
 
-/**
- * The base micro-interaction: a spring scale-down on press + a haptic tap.
- * Wraps a core Pressable (so NativeWind className works) in an Animated.View
- * (which carries the native-driven scale). Used by every tappable surface.
- */
 export function PressableScale({
   className,
   scaleTo = 0.96,
@@ -27,6 +36,7 @@ export function PressableScale({
   onPress,
   onPressIn,
   onPressOut,
+  style,
   children,
   ...props
 }: Props) {
@@ -40,26 +50,25 @@ export function PressableScale({
     }).start();
 
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable
-        className={className}
-        disabled={disabled}
-        onPressIn={(e) => {
-          spring(scaleTo);
-          onPressIn?.(e);
-        }}
-        onPressOut={(e) => {
-          spring(1);
-          onPressOut?.(e);
-        }}
-        onPress={(e) => {
-          if (haptic && !disabled) haptics[haptic]();
-          onPress?.(e);
-        }}
-        {...props}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
+    <AnimatedPressable
+      className={className}
+      disabled={disabled}
+      style={[{ transform: [{ scale }] }, style]}
+      onPressIn={(e) => {
+        spring(scaleTo);
+        onPressIn?.(e);
+      }}
+      onPressOut={(e) => {
+        spring(1);
+        onPressOut?.(e);
+      }}
+      onPress={(e) => {
+        if (haptic && !disabled) haptics[haptic]();
+        onPress?.(e);
+      }}
+      {...props}
+    >
+      {children}
+    </AnimatedPressable>
   );
 }
