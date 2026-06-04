@@ -51,3 +51,6 @@ saral-*.png
 
 # local agent guide
 /AGENTS.md
+
+# expo
+.expo/
