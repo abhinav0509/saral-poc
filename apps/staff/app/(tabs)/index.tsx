@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Linking,
   LayoutAnimation,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -373,7 +372,6 @@ function QueueRow({
   onCall: () => void;
   onDrop: () => void;
 }) {
-  const dial = visit.mobile ? visit.mobile.replace(/\D/g, "").slice(-10) : null;
   return (
     <View className="flex-row items-center gap-3 py-3">
       <View className="size-11 rounded-lg bg-surface-sunken items-center justify-center">
@@ -392,7 +390,7 @@ function QueueRow({
           <Text className="text-caption text-text-tertiary">{eta}</Text>
         </View>
       </View>
-      <View className="flex-row items-center gap-1.5">
+      <View className="flex-row items-center gap-2">
         <PressableScale
           haptic={null}
           onPress={onDrop}
@@ -401,22 +399,11 @@ function QueueRow({
           <X size={16} color={palette.muted} />
         </PressableScale>
         <PressableScale
-          haptic="light"
-          disabled={!dial}
-          onPress={() => dial && Linking.openURL(`tel:${dial}`)}
-          className={cn(
-            "size-9 rounded-full bg-surface-brand-subtle items-center justify-center",
-            !dial && "opacity-40",
-          )}
-        >
-          <Phone size={16} color={palette.brand} />
-        </PressableScale>
-        <PressableScale
           haptic={null}
           disabled={busy}
           onPress={onCall}
           className={cn(
-            "h-9 px-3.5 rounded-full bg-surface-brand items-center justify-center",
+            "h-9 px-4 rounded-full bg-surface-brand items-center justify-center",
             busy && "opacity-40",
           )}
         >
