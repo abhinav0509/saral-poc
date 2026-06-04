@@ -1,7 +1,7 @@
 -- ==============================================================
 -- SARAL · Phase 1 · apply migrations 0003–0006 in one go.
 -- Safe/additive: adds tenancy, public_token, constraints, RPCs.
--- Does NOT change the existing permissive RLS (that's Phase 2).
+-- Heals pre-existing POC duplicates before adding unique indexes.
 -- Run this whole script once in the Supabase SQL Editor.
 -- ==============================================================
 
@@ -261,15 +261,52 @@ CREATE INDEX IF NOT EXISTS prescriptions_clinic_created_idx ON prescriptions(cli
 -- Concurrency invariants — enforced by the DB, not racy JS preflights.
 -- ============================================================
 
+-- Heal pre-existing data first so the unique indexes can be built. These
+-- UPDATEs are no-ops on a clean DB; on an old POC DB they resolve the
+-- duplicates that earlier racy JS preflights allowed.
+
+-- (a) Collapse any clinic with >1 now_serving down to the most recent one.
+WITH ns AS (
+  SELECT id, row_number() OVER (
+    PARTITION BY clinic_id ORDER BY started_at DESC NULLS LAST, created_at DESC
+  ) AS rn
+  FROM visits WHERE status = 'now_serving'
+)
+UPDATE visits v
+SET status = 'done', ended_at = coalesce(v.ended_at, now())
+FROM ns WHERE v.id = ns.id AND ns.rn > 1;
+
 -- At most one patient "now_serving" per clinic.
 CREATE UNIQUE INDEX IF NOT EXISTS visits_one_now_serving_idx
   ON visits(clinic_id)
   WHERE status = 'now_serving';
 
+-- (b) If two live bookings share a slot, keep the earliest and free the rest
+--     (they become slot-less walk-ins rather than being deleted).
+WITH s AS (
+  SELECT id, row_number() OVER (
+    PARTITION BY clinic_id, booked_for ORDER BY created_at
+  ) AS rn
+  FROM visits WHERE booked_for IS NOT NULL AND status <> 'dropped'
+)
+UPDATE visits v SET booked_for = NULL
+FROM s WHERE v.id = s.id AND s.rn > 1;
+
 -- No two live (non-dropped) bookings on the same exact slot in a clinic.
 CREATE UNIQUE INDEX IF NOT EXISTS visits_unique_slot_idx
   ON visits(clinic_id, booked_for)
   WHERE booked_for IS NOT NULL AND status <> 'dropped';
+
+-- (c) Make duplicate per-day tokens unique by suffixing the later duplicates
+--     (keeps the first occurrence's token intact).
+WITH t AS (
+  SELECT id, row_number() OVER (
+    PARTITION BY clinic_id, token, service_date ORDER BY created_at
+  ) AS rn
+  FROM visits
+)
+UPDATE visits v SET token = v.token || '-' || (t.rn - 1)
+FROM t WHERE v.id = t.id AND t.rn > 1;
 
 -- Token is a per-day counter, so it must be unique per clinic per IST day.
 CREATE UNIQUE INDEX IF NOT EXISTS visits_token_per_day_idx
