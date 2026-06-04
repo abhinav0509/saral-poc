@@ -21,8 +21,7 @@
       "output": "single"
     },
     "plugins": [
-      "expo-router",
-      "expo-status-bar"
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true,
