@@ -151,7 +151,7 @@ export default function QueueScreen() {
         </View>
         <PressableScale
           haptic="light"
-          onPress={() => Alert.alert("Add walk-in", "The walk-in form lands in the next build.")}
+          onPress={() => router.push("/walkin")}
           className="h-9 px-3 flex-row items-center gap-1.5 bg-surface-brand rounded-full"
         >
           <Plus size={16} color="#fff" strokeWidth={2.5} />
