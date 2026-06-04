@@ -6,12 +6,18 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Linking,
   LayoutAnimation,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Plus, X, Camera, Phone } from "lucide-react-native";
+import { Plus, X, Camera, Phone, MoreVertical } from "lucide-react-native";
 import { DropConfirmSheet } from "@/components/staff/DropConfirmSheet";
+import { RowActionsSheet } from "@/components/staff/RowActionsSheet";
+
+// Where the patient live-visit page is hosted (used for the WhatsApp link).
+// TODO: point at the deployed patient web once it's live.
+const PATIENT_WEB_BASE = "https://saral.vercel.app";
 import {
   getClinicByCode,
   getActiveQueue,
@@ -51,6 +57,7 @@ export default function QueueScreen() {
   const [tab, setTab] = useState<TabKey>("waiting");
   const [dropTarget, setDropTarget] = useState<Visit | null>(null);
   const [dropping, setDropping] = useState(false);
+  const [menuTarget, setMenuTarget] = useState<Visit | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -130,6 +137,21 @@ export default function QueueScreen() {
 
   function handleSaveRx() {
     if (nowServing) router.push(`/visit/${nowServing.id}/save`);
+  }
+
+  function handleSendWhatsapp(v: Visit) {
+    if (!v.mobile) {
+      Alert.alert("No mobile on file", "Add a mobile number to send the link.");
+      return;
+    }
+    const url = `${PATIENT_WEB_BASE}/v/${encodeURIComponent(v.public_token)}`;
+    const msg = `Your live visit link at ${clinic?.name ?? "the clinic"} — track your queue position here: ${url}`;
+    const intl = `91${v.mobile.replace(/^\+?91/, "").replace(/\D/g, "")}`;
+    void Linking.openURL(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`);
+  }
+
+  function handleOpenHistory() {
+    Alert.alert("Patient history", "The full patient history screen lands in the next build.");
   }
 
   const dateLabel = new Date().toLocaleDateString("en-IN", {
@@ -247,9 +269,9 @@ export default function QueueScreen() {
               <QueueRow
                 visit={item}
                 eta={formatEta(minutesForQueueIndex(index))}
-                busy={busy}
-                onCall={() => handleCall(item)}
+                onOpenHistory={handleOpenHistory}
                 onDrop={() => confirmDrop(item)}
+                onMenu={() => setMenuTarget(item)}
               />
             ) : (
               <PastRow visit={item} />
@@ -275,6 +297,14 @@ export default function QueueScreen() {
         pending={dropping}
         onConfirm={handleConfirmDrop}
         onClose={() => setDropTarget(null)}
+      />
+
+      <RowActionsSheet
+        visit={menuTarget}
+        onBringIn={() => menuTarget && handleCall(menuTarget)}
+        onSendWhatsapp={() => menuTarget && handleSendWhatsapp(menuTarget)}
+        onOpenHistory={handleOpenHistory}
+        onClose={() => setMenuTarget(null)}
       />
     </SafeAreaView>
   );
@@ -362,52 +392,71 @@ function NowServingCard({
 function QueueRow({
   visit,
   eta,
-  busy,
-  onCall,
+  onOpenHistory,
   onDrop,
+  onMenu,
 }: {
   visit: Visit;
   eta: string;
-  busy: boolean;
-  onCall: () => void;
+  onOpenHistory: () => void;
   onDrop: () => void;
+  onMenu: () => void;
 }) {
+  const dialer = visit.mobile ? visit.mobile.replace(/\D/g, "").slice(-10) : null;
   return (
     <View className="flex-row items-center gap-3 py-3">
-      <View className="size-11 rounded-lg bg-surface-sunken items-center justify-center">
-        <Text className="text-[10px] font-medium text-text-tertiary">T</Text>
-        <Text className="text-label-md font-semibold text-text-primary" style={tnum}>
-          {visit.token.replace(/^T-?/, "")}
-        </Text>
-      </View>
-      <View className="flex-1">
-        <Text className="text-label-lg font-semibold text-text-primary" numberOfLines={1}>
-          {visit.patient_name}
-        </Text>
-        <View className="flex-row items-center gap-2 mt-1">
-          <SourceBadge source={visit.source} />
-          <View className="size-0.5 rounded-full" style={{ backgroundColor: palette.borderDefault }} />
-          <Text className="text-caption text-text-tertiary">{eta}</Text>
+      {/* Tap the patient to open history */}
+      <PressableScale
+        haptic={null}
+        scaleTo={0.99}
+        onPress={onOpenHistory}
+        className="flex-1 flex-row items-center gap-3"
+      >
+        <View className="size-11 rounded-lg bg-surface-sunken items-center justify-center">
+          <Text className="text-[10px] font-medium text-text-tertiary">T</Text>
+          <Text className="text-label-md font-semibold text-text-primary" style={tnum}>
+            {visit.token.replace(/^T-?/, "")}
+          </Text>
         </View>
-      </View>
-      <View className="flex-row items-center gap-2">
+        <View className="flex-1">
+          <Text className="text-label-lg font-semibold text-text-primary" numberOfLines={1}>
+            {visit.patient_name}
+          </Text>
+          <View className="flex-row items-center gap-2 mt-1">
+            <SourceBadge source={visit.source} />
+            <View className="size-0.5 rounded-full" style={{ backgroundColor: palette.borderDefault }} />
+            <Text className="text-caption text-text-tertiary">{eta}</Text>
+          </View>
+        </View>
+      </PressableScale>
+
+      <View className="flex-row items-center gap-1">
         <PressableScale
           haptic={null}
           onPress={onDrop}
-          className="size-9 rounded-lg border border-border-default items-center justify-center"
+          className="size-9 rounded-lg bg-surface-canvas border border-border-default items-center justify-center"
         >
           <X size={16} color={palette.muted} />
         </PressableScale>
+        {dialer ? (
+          <PressableScale
+            haptic="light"
+            onPress={() => Linking.openURL(`tel:${dialer}`)}
+            className="size-9 rounded-full bg-surface-brand-subtle items-center justify-center"
+          >
+            <Phone size={16} color={palette.brand} strokeWidth={2.2} />
+          </PressableScale>
+        ) : (
+          <View className="size-9 rounded-full bg-surface-sunken items-center justify-center opacity-50">
+            <Phone size={16} color={palette.tertiary} strokeWidth={2.2} />
+          </View>
+        )}
         <PressableScale
-          haptic={null}
-          disabled={busy}
-          onPress={onCall}
-          className={cn(
-            "h-9 px-4 rounded-full bg-surface-brand items-center justify-center",
-            busy && "opacity-40",
-          )}
+          haptic="light"
+          onPress={onMenu}
+          className="size-9 rounded-lg items-center justify-center"
         >
-          <Text className="text-label-md font-semibold text-white">Call in</Text>
+          <MoreVertical size={16} color={palette.tertiary} />
         </PressableScale>
       </View>
     </View>

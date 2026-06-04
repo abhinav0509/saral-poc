@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Image,
+  TextInput,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -10,9 +11,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, RotateCcw } from "lucide-react-native";
+import { Camera, RotateCcw, Plus, X, CheckCircle2, ArrowRight } from "lucide-react-native";
 import {
   getVisitById,
+  getActiveQueue,
   savePrescription,
   markVisitDone,
   callNext,
@@ -26,11 +28,16 @@ import { Input } from "@/components/ui/Input";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { haptics } from "@/lib/haptics";
 import { palette } from "@/lib/colors";
+import { cn } from "@/lib/cn";
 
-const ACCENT = palette.accent;
+interface Med {
+  name: string;
+  dose: string;
+}
+
+const QUICK_ADD_MEDS = ["Calpol 250mg", "ORS sachet", "Vitamin C", "Domstal"];
 
 function base64ToBytes(b64: string): Uint8Array {
-  // atob is a RN global (0.74+) but not in the TS lib we target.
   const decode = (globalThis as unknown as { atob: (s: string) => string }).atob;
   const bin = decode(b64);
   const bytes = new Uint8Array(bin.length);
@@ -42,14 +49,27 @@ export default function SaveRxScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [visit, setVisit] = useState<Visit | null>(null);
+  const [nextToken, setNextToken] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoB64, setPhotoB64] = useState<string | null>(null);
+  const [meds, setMeds] = useState<Med[]>([
+    { name: "Paracetamol 500mg", dose: "1 · TDS · 3d" },
+    { name: "Cetirizine 10mg", dose: "1 · HS · 5d" },
+  ]);
+  const [newMedName, setNewMedName] = useState("");
+  const [newMedDose, setNewMedDose] = useState("");
   const [followUp, setFollowUp] = useState("Review in 3 days if no improvement");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
-      if (id) setVisit(await getVisitById(id));
+      if (!id) return;
+      const v = await getVisitById(id);
+      setVisit(v);
+      if (v) {
+        const q = await getActiveQueue(v.clinic_id);
+        setNextToken(q.find((x) => x.status === "waiting")?.token ?? null);
+      }
     })();
   }, [id]);
 
@@ -60,16 +80,29 @@ export default function SaveRxScreen() {
       return;
     }
     haptics.light();
-    const result = await ImagePicker.launchCameraAsync({
-      quality: 0.5,
-      base64: true,
-      cameraType: ImagePicker.CameraType.back,
-    });
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.5, base64: true });
     if (!result.canceled && result.assets[0]) {
       setPhotoUri(result.assets[0].uri);
       setPhotoB64(result.assets[0].base64 ?? null);
       haptics.success();
     }
+  }
+
+  function addMed() {
+    const name = newMedName.trim();
+    if (!name) return;
+    setMeds([...meds, { name, dose: newMedDose.trim() || "as directed" }]);
+    setNewMedName("");
+    setNewMedDose("");
+    haptics.selection();
+  }
+  function quickAdd(name: string) {
+    if (meds.some((m) => m.name.toLowerCase() === name.toLowerCase())) return;
+    setMeds([...meds, { name, dose: "as directed" }]);
+    haptics.selection();
+  }
+  function removeMed(i: number) {
+    setMeds(meds.filter((_, idx) => idx !== i));
   }
 
   async function onSave() {
@@ -87,7 +120,7 @@ export default function SaveRxScreen() {
       await savePrescription({
         visitId: visit.id,
         photoUrl,
-        typedMeds: [],
+        typedMeds: meds,
         followUpNote: followUp.trim() || null,
       });
       await markVisitDone(visit.id);
@@ -95,14 +128,19 @@ export default function SaveRxScreen() {
       haptics.success();
       router.back();
     } catch (e) {
-      Alert.alert("Couldn't save", e instanceof Error ? e.message : "");
+      Alert.alert("Couldn't save the prescription", e instanceof Error ? e.message : "");
       setSaving(false);
     }
   }
 
   return (
     <SafeAreaView className="flex-1 bg-surface-canvas" edges={["top", "bottom"]}>
-      <ScreenHeader title="Wrap up visit" />
+      <ScreenHeader
+        title="Wrap up visit"
+        right={
+          <Text className="text-label-sm font-medium text-text-brand pr-3">Step 2 / 2</Text>
+        }
+      />
       {!visit ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={palette.brand} />
@@ -111,7 +149,7 @@ export default function SaveRxScreen() {
         <>
           <ScrollView
             className="flex-1"
-            contentContainerClassName="p-4 gap-4"
+            contentContainerClassName="px-4 pt-4 pb-6 gap-4"
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
           >
@@ -126,7 +164,7 @@ export default function SaveRxScreen() {
                   {visit.gender ?? "—"} · {visit.age ?? "—"} · {visit.reason ?? "—"}
                 </Text>
               </View>
-              <View className="h-7 px-2.5 rounded-md bg-surface-sunken items-center justify-center">
+              <View className="h-6 px-2 rounded-md bg-surface-sunken items-center justify-center">
                 <Text className="text-label-sm font-semibold text-text-primary">{visit.token}</Text>
               </View>
             </Card>
@@ -152,7 +190,6 @@ export default function SaveRxScreen() {
             ) : (
               <PressableScale haptic={null} onPress={capture} className="h-56 rounded-2xl overflow-hidden">
                 <View className="flex-1 bg-surface-inverse items-center justify-center">
-                  {/* Haldi corner brackets */}
                   <Corner pos="tl" />
                   <Corner pos="tr" />
                   <Corner pos="bl" />
@@ -173,7 +210,81 @@ export default function SaveRxScreen() {
               </Text>
             )}
 
-            <Text className="text-label-lg font-semibold text-text-primary px-1 pt-1">Follow-up note</Text>
+            {/* Medicines */}
+            <View className="flex-row items-end justify-between px-0.5 pt-2">
+              <Text className="text-label-lg font-semibold text-text-primary">Medicines</Text>
+              <Text className="text-caption text-text-tertiary">optional</Text>
+            </View>
+
+            <View className="gap-2">
+              {meds.map((m, i) => (
+                <Card key={i} surface="raised" bordered className="px-3 py-2.5 flex-row items-center gap-3">
+                  <View className="size-3 rounded-full border-2 border-text-brand" />
+                  <View className="flex-1">
+                    <Text className="text-label-md font-semibold text-text-primary" numberOfLines={1}>
+                      {m.name}
+                    </Text>
+                    <Text className="text-caption text-text-secondary" numberOfLines={1}>
+                      {m.dose || "as directed"}
+                    </Text>
+                  </View>
+                  <PressableScale haptic={null} onPress={() => removeMed(i)} className="size-8 items-center justify-center">
+                    <X size={16} color={palette.tertiary} />
+                  </PressableScale>
+                </Card>
+              ))}
+
+              {/* Add med inline */}
+              <View className="flex-row gap-2">
+                <TextInput
+                  value={newMedName}
+                  onChangeText={setNewMedName}
+                  placeholder="Add a medicine"
+                  placeholderTextColor={palette.tertiary}
+                  className="flex-1 h-11 px-3 rounded-xl bg-surface-canvas border border-border-default text-body-md text-text-primary"
+                />
+                <TextInput
+                  value={newMedDose}
+                  onChangeText={setNewMedDose}
+                  placeholder="Dose"
+                  placeholderTextColor={palette.tertiary}
+                  className="w-24 h-11 px-3 rounded-xl bg-surface-canvas border border-border-default text-body-md text-text-primary"
+                />
+                <PressableScale
+                  haptic="light"
+                  onPress={addMed}
+                  disabled={!newMedName.trim()}
+                  className={cn(
+                    "size-11 rounded-xl bg-surface-brand items-center justify-center",
+                    !newMedName.trim() && "opacity-40",
+                  )}
+                >
+                  <Plus size={20} color="#fff" />
+                </PressableScale>
+              </View>
+
+              {/* Quick add chips */}
+              <View className="flex-row items-center flex-wrap gap-2 pt-1">
+                <Text className="text-caption text-text-tertiary mr-1">Quick add:</Text>
+                {QUICK_ADD_MEDS.map((name) => (
+                  <PressableScale
+                    key={name}
+                    haptic="selection"
+                    onPress={() => quickAdd(name)}
+                    className="h-7 px-2.5 flex-row items-center gap-1 rounded-full bg-surface-canvas border border-border-default"
+                  >
+                    <Plus size={12} color={palette.ink} />
+                    <Text className="text-label-sm text-text-primary">{name}</Text>
+                  </PressableScale>
+                ))}
+              </View>
+            </View>
+
+            {/* Follow-up */}
+            <View className="flex-row items-end justify-between px-0.5 pt-2">
+              <Text className="text-label-lg font-semibold text-text-primary">Follow-up note</Text>
+              <Text className="text-caption text-text-tertiary">optional</Text>
+            </View>
             <Input
               value={followUp}
               onChangeText={setFollowUp}
@@ -181,9 +292,21 @@ export default function SaveRxScreen() {
             />
           </ScrollView>
 
-          <View className="p-4 border-t border-border-subtle">
-            <Button block size="lg" disabled={saving} onPress={onSave}>
-              {saving ? "Saving…" : "Save & call next"}
+          {/* Sticky CTA */}
+          <View className="px-4 pt-3 pb-2 border-t border-border-subtle gap-2">
+            <View className="flex-row items-center justify-center gap-1.5">
+              <View className="size-1.5 rounded-full" style={{ backgroundColor: palette.sage }} />
+              <Text className="text-caption text-text-secondary">Sends on WhatsApp the moment you save</Text>
+            </View>
+            <Button
+              block
+              size="lg"
+              disabled={saving}
+              onPress={onSave}
+              leadingIcon={!saving ? <CheckCircle2 size={20} color="#fff" /> : undefined}
+              trailingIcon={!saving && nextToken ? <ArrowRight size={18} color="#fff" /> : undefined}
+            >
+              {saving ? "Saving…" : nextToken ? `Save & call next → ${nextToken}` : "Save & finish"}
             </Button>
           </View>
         </>
@@ -193,12 +316,11 @@ export default function SaveRxScreen() {
 }
 
 function Corner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
-  const base = "absolute w-7 h-7 border-accent-500";
   const map = {
     tl: "top-7 left-7 border-l-[3px] border-t-[3px] rounded-tl",
     tr: "top-7 right-7 border-r-[3px] border-t-[3px] rounded-tr",
     bl: "bottom-7 left-7 border-l-[3px] border-b-[3px] rounded-bl",
     br: "bottom-7 right-7 border-r-[3px] border-b-[3px] rounded-br",
   } as const;
-  return <View className={`${base} ${map[pos]}`} style={{ borderColor: ACCENT }} />;
+  return <View className={cn("absolute w-7 h-7", map[pos])} style={{ borderColor: palette.accent }} />;
 }
