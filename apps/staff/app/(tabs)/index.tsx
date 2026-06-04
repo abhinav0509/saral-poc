@@ -6,10 +6,13 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Linking,
+  LayoutAnimation,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Plus, X, Camera, Phone } from "lucide-react-native";
+import { DropConfirmSheet } from "@/components/staff/DropConfirmSheet";
 import {
   getClinicByCode,
   getActiveQueue,
@@ -47,6 +50,8 @@ export default function QueueScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<TabKey>("waiting");
+  const [dropTarget, setDropTarget] = useState<Visit | null>(null);
+  const [dropping, setDropping] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -57,6 +62,8 @@ export default function QueueScreen() {
       }
       const [q, t] = await Promise.all([getActiveQueue(c.id), getTodayVisits(c.id)]);
       setClinic(c);
+      // Smoothly animate rows in/out as the queue changes (call-in, drop, joins).
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setQueue(q);
       setTodayAll(t);
       setError(null);
@@ -106,24 +113,20 @@ export default function QueueScreen() {
 
   function confirmDrop(v: Visit) {
     haptics.warning();
-    Alert.alert(
-      `Drop ${v.token}?`,
-      `Remove ${v.patient_name} from the queue? In the real flow, call them first — we never drop silently.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Drop",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await dropVisit(v.id);
-            } catch (e) {
-              Alert.alert("Couldn't drop", e instanceof Error ? e.message : "");
-            }
-          },
-        },
-      ],
-    );
+    setDropTarget(v);
+  }
+
+  async function handleConfirmDrop() {
+    if (!dropTarget || dropping) return;
+    setDropping(true);
+    try {
+      await dropVisit(dropTarget.id);
+      setDropTarget(null);
+    } catch (e) {
+      Alert.alert("Couldn't drop", e instanceof Error ? e.message : "");
+    } finally {
+      setDropping(false);
+    }
   }
 
   function handleSaveRx() {
@@ -267,6 +270,13 @@ export default function QueueScreen() {
           }
         />
       )}
+
+      <DropConfirmSheet
+        visit={dropTarget}
+        pending={dropping}
+        onConfirm={handleConfirmDrop}
+        onClose={() => setDropTarget(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -363,6 +373,7 @@ function QueueRow({
   onCall: () => void;
   onDrop: () => void;
 }) {
+  const dial = visit.mobile ? visit.mobile.replace(/\D/g, "").slice(-10) : null;
   return (
     <View className="flex-row items-center gap-3 py-3">
       <View className="size-11 rounded-lg bg-surface-sunken items-center justify-center">
@@ -381,21 +392,37 @@ function QueueRow({
           <Text className="text-caption text-text-tertiary">{eta}</Text>
         </View>
       </View>
-      <PressableScale
-        haptic={null}
-        onPress={onDrop}
-        className="size-9 rounded-lg border border-border-default items-center justify-center"
-      >
-        <X size={16} color={palette.muted} />
-      </PressableScale>
-      <PressableScale
-        haptic={null}
-        disabled={busy}
-        onPress={onCall}
-        className={cn("h-9 px-4 rounded-full bg-surface-brand items-center justify-center", busy && "opacity-40")}
-      >
-        <Text className="text-label-md font-semibold text-white">Call in</Text>
-      </PressableScale>
+      <View className="flex-row items-center gap-1.5">
+        <PressableScale
+          haptic={null}
+          onPress={onDrop}
+          className="size-9 rounded-lg border border-border-default items-center justify-center"
+        >
+          <X size={16} color={palette.muted} />
+        </PressableScale>
+        <PressableScale
+          haptic="light"
+          disabled={!dial}
+          onPress={() => dial && Linking.openURL(`tel:${dial}`)}
+          className={cn(
+            "size-9 rounded-full bg-surface-brand-subtle items-center justify-center",
+            !dial && "opacity-40",
+          )}
+        >
+          <Phone size={16} color={palette.brand} />
+        </PressableScale>
+        <PressableScale
+          haptic={null}
+          disabled={busy}
+          onPress={onCall}
+          className={cn(
+            "h-9 px-3.5 rounded-full bg-surface-brand items-center justify-center",
+            busy && "opacity-40",
+          )}
+        >
+          <Text className="text-label-md font-semibold text-white">Call in</Text>
+        </PressableScale>
+      </View>
     </View>
   );
 }
