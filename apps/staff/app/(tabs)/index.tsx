@@ -195,7 +195,7 @@ export default function HomeScreen() {
               <QuickAction
                 label="Send reminders"
                 icon={<BellRing size={22} strokeWidth={2.2} color={palette.brand} />}
-                onPress={() => Alert.alert("Reminders", "The reminders screen lands in the next build.")}
+                onPress={() => router.push("/reminders")}
               />
               <QuickAction
                 label="Walk-in"
