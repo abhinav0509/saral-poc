@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { View, Text, ScrollView, Linking, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, Linking, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Phone, MoreHorizontal, Calendar, Camera } from "lucide-react-native";
 import { getClinicByCode, getPatientHistoryByMobile, type Visit } from "@saral/core";
 import { ScreenHeader } from "@/components/staff/ScreenHeader";
@@ -22,6 +22,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 ];
 
 export default function PatientHistoryScreen() {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [visits, setVisits] = useState<Visit[] | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -158,7 +159,7 @@ export default function PatientHistoryScreen() {
           size="lg"
           block
           leadingIcon={<Calendar size={18} color={palette.ink} />}
-          onPress={() => Alert.alert("Book again", "The booking screen lands in the next build.")}
+          onPress={() => router.push("/booking/new")}
         >
           Book again
         </Button>
