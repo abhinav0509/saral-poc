@@ -150,8 +150,9 @@ export default function QueueScreen() {
     void Linking.openURL(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`);
   }
 
-  function handleOpenHistory() {
-    Alert.alert("Patient history", "The full patient history screen lands in the next build.");
+  function openHistory(v: Visit) {
+    const key = v.mobile ? v.mobile.replace(/\D/g, "").slice(-10) || v.id : v.id;
+    router.push(`/patient/${key}`);
   }
 
   const dateLabel = new Date().toLocaleDateString("en-IN", {
@@ -269,7 +270,7 @@ export default function QueueScreen() {
               <QueueRow
                 visit={item}
                 eta={formatEta(minutesForQueueIndex(index))}
-                onOpenHistory={handleOpenHistory}
+                onOpenHistory={() => openHistory(item)}
                 onDrop={() => confirmDrop(item)}
                 onMenu={() => setMenuTarget(item)}
               />
@@ -303,7 +304,7 @@ export default function QueueScreen() {
         visit={menuTarget}
         onBringIn={() => menuTarget && handleCall(menuTarget)}
         onSendWhatsapp={() => menuTarget && handleSendWhatsapp(menuTarget)}
-        onOpenHistory={handleOpenHistory}
+        onOpenHistory={() => menuTarget && openHistory(menuTarget)}
         onClose={() => setMenuTarget(null)}
       />
     </SafeAreaView>
