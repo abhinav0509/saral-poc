@@ -5,7 +5,6 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Linking,
   LayoutAnimation,
 } from "react-native";
@@ -36,6 +35,7 @@ import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { SourceBadge } from "@/components/ui/SourceBadge";
 import { LivePulse } from "@/components/ui/LivePulse";
 import { PressableScale } from "@/components/ui/PressableScale";
+import { useToast } from "@/components/ui/toast";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { palette } from "@/lib/colors";
 import { haptics } from "@/lib/haptics";
@@ -47,6 +47,7 @@ type TabKey = "waiting" | "done" | "all";
 
 export default function QueueScreen() {
   const router = useRouter();
+  const { show } = useToast();
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [queue, setQueue] = useState<Visit[]>([]);
   const [todayAll, setTodayAll] = useState<Visit[]>([]);
@@ -110,8 +111,9 @@ export default function QueueScreen() {
     haptics.success();
     try {
       await callIn(v.id, clinic.id);
+      show({ tone: "success", title: `${v.token} called in`, desc: `${v.patient_name} is now with the doctor` });
     } catch (e) {
-      Alert.alert("Couldn't call in", e instanceof Error ? e.message : "");
+      show({ tone: "error", title: "Couldn't call in", desc: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(false);
     }
@@ -125,11 +127,13 @@ export default function QueueScreen() {
   async function handleConfirmDrop() {
     if (!dropTarget || dropping) return;
     setDropping(true);
+    const dropped = dropTarget;
     try {
-      await dropVisit(dropTarget.id);
+      await dropVisit(dropped.id);
       setDropTarget(null);
+      show({ tone: "info", title: `${dropped.token} dropped`, desc: `${dropped.patient_name} removed from the queue` });
     } catch (e) {
-      Alert.alert("Couldn't drop", e instanceof Error ? e.message : "");
+      show({ tone: "error", title: "Couldn't drop", desc: e instanceof Error ? e.message : undefined });
     } finally {
       setDropping(false);
     }
@@ -141,7 +145,7 @@ export default function QueueScreen() {
 
   function handleSendWhatsapp(v: Visit) {
     if (!v.mobile) {
-      Alert.alert("No mobile on file", "Add a mobile number to send the link.");
+      show({ tone: "error", title: "No mobile on file", desc: "Add a mobile number to send the link." });
       return;
     }
     const url = `${PATIENT_WEB_BASE}/v/${encodeURIComponent(v.public_token)}`;

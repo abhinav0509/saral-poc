@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { View, Text, ScrollView, Share, Linking, Alert } from "react-native";
+import { View, Text, ScrollView, Linking, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/Card";
 import { LivePulse } from "@/components/ui/LivePulse";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { PressableScale } from "@/components/ui/PressableScale";
+import { ShareLinkSheet } from "@/components/share/ShareLinkSheet";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
 
@@ -40,6 +41,7 @@ export default function HomeScreen() {
   const [active, setActive] = useState<Visit[]>([]);
   const [now, setNow] = useState(() => new Date());
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const reload = useCallback(async () => {
     const c = await getClinicByCode(CLINIC_CODE);
@@ -85,13 +87,6 @@ export default function HomeScreen() {
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const dateLabel = now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
-  async function shareLink() {
-    if (!clinic) return;
-    await Share.share({
-      message: `Self check-in at ${clinic.name} — scan or open: ${PATIENT_WEB_BASE}/walkin/${clinic.code}`,
-    });
-  }
-
   return (
     <SafeAreaView className="flex-1 bg-surface-canvas" edges={["top"]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="pb-10">
@@ -103,7 +98,7 @@ export default function HomeScreen() {
           </View>
           <PressableScale
             haptic="light"
-            onPress={shareLink}
+            onPress={() => setShareOpen(true)}
             className="h-9 px-3 mt-1 flex-row items-center gap-1.5 rounded-full"
           >
             <Share2 size={16} color={palette.brand} />
@@ -220,6 +215,13 @@ export default function HomeScreen() {
           setEmergencyOpen(false);
           router.push("/walkin");
         }}
+      />
+
+      <ShareLinkSheet
+        visible={shareOpen}
+        url={`${PATIENT_WEB_BASE}/walkin/${clinic?.code ?? ""}`}
+        clinicName={clinic?.name ?? "the clinic"}
+        onClose={() => setShareOpen(false)}
       />
     </SafeAreaView>
   );

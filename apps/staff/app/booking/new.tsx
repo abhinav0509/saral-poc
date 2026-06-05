@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, ScrollView, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Check, Calendar, Phone, Globe } from "lucide-react-native";
@@ -22,12 +22,14 @@ import { SlotPicker, type SlotPickerHandle } from "@/components/booking/SlotPick
 import { haptics } from "@/lib/haptics";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
+import { useToast } from "@/components/ui/toast";
 
 const CLINIC_CODE = "drmehta";
 type Gender = "Female" | "Male" | "Other";
 
 export default function NewBookingScreen() {
   const router = useRouter();
+  const { show } = useToast();
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
@@ -58,7 +60,7 @@ export default function NewBookingScreen() {
     const msg = validate();
     if (msg) {
       haptics.warning();
-      Alert.alert("Hold on", msg);
+      show({ tone: "error", title: "Hold on", desc: msg });
       return;
     }
     if (!clinic || saving) return;
@@ -76,15 +78,16 @@ export default function NewBookingScreen() {
         bookedFor,
       });
       haptics.success();
+      show({ tone: "success", title: "Booking confirmed", desc: `${name.trim()} · ${formatSlotTime(slot!.time)}` });
       router.back();
     } catch (err) {
       if (err instanceof SlotConflictError) {
         setSlot(null);
         setConflictHint({ time: slot!.time });
         await pickerRef.current?.refresh();
-        Alert.alert("Just taken", "Pick one of the suggested alternates below.");
+        show({ tone: "error", title: "Just taken", desc: "Pick one of the suggested alternates below." });
       } else {
-        Alert.alert("Couldn't save", err instanceof Error ? err.message : "");
+        show({ tone: "error", title: "Couldn't save", desc: err instanceof Error ? err.message : undefined });
       }
       setSaving(false);
     }
@@ -210,7 +213,7 @@ export default function NewBookingScreen() {
                 setConflictHint(null);
               }}
               conflictHint={conflictHint}
-              onNotice={(n) => Alert.alert(n.title, n.desc)}
+              onNotice={(n) => show({ tone: "info", title: n.title, desc: n.desc })}
             />
           </ScrollView>
 

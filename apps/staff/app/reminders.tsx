@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, ScrollView, Linking, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, Linking, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BellRing, CheckCircle2, Phone } from "lucide-react-native";
 import {
@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/Card";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
+import { useToast } from "@/components/ui/toast";
 import { palette } from "@/lib/colors";
 import { haptics } from "@/lib/haptics";
 import { cn } from "@/lib/cn";
@@ -22,6 +23,7 @@ type Tab = "due" | "upcoming" | "sent";
 type Enriched = ReminderRow & { days: number | null; dueAt: Date | null };
 
 export default function RemindersScreen() {
+  const { show } = useToast();
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [reminders, setReminders] = useState<ReminderRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +65,7 @@ export default function RemindersScreen() {
 
   function handleSend(r: Enriched) {
     if (!r.mobile) {
-      Alert.alert("No mobile on file", "Can't reach this patient on WhatsApp without a mobile number.");
+      show({ tone: "info", title: "No mobile on file", desc: "Can't reach this patient on WhatsApp without a mobile number." });
       return;
     }
     const intl = `91${r.mobile.replace(/\D/g, "").slice(-10)}`;
@@ -79,6 +81,7 @@ export default function RemindersScreen() {
       "Reply here on WhatsApp or call us to confirm a time. Take care.",
     ].join("\n");
     void Linking.openURL(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`);
+    show({ tone: "success", title: "Message ready in WhatsApp", desc: `Drafted for ${firstName} — review and tap send.` });
   }
 
   return (

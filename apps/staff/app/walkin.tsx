@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, ScrollView, Alert } from "react-native";
+import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { getClinicByCode, createVisit, type Clinic } from "@saral/core";
@@ -7,6 +7,7 @@ import { ScreenHeader } from "@/components/staff/ScreenHeader";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { PressableScale } from "@/components/ui/PressableScale";
+import { useToast } from "@/components/ui/toast";
 import { haptics } from "@/lib/haptics";
 import { cn } from "@/lib/cn";
 
@@ -15,6 +16,7 @@ const CLINIC_CODE = "drmehta";
 
 export default function WalkinScreen() {
   const router = useRouter();
+  const { show } = useToast();
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
@@ -40,7 +42,7 @@ export default function WalkinScreen() {
     const msg = validate();
     if (msg) {
       haptics.warning();
-      Alert.alert("Hold on", msg);
+      show({ tone: "error", title: "Hold on", desc: msg });
       return;
     }
     if (!clinic || saving) return;
@@ -56,9 +58,10 @@ export default function WalkinScreen() {
         reason: reason.trim() || null,
       });
       haptics.success();
+      show({ tone: "success", title: `${name.trim()} added to the queue`, desc: "They'll show under Waiting." });
       router.back();
     } catch (e) {
-      Alert.alert("Couldn't add", e instanceof Error ? e.message : "");
+      show({ tone: "error", title: "Couldn't add", desc: e instanceof Error ? e.message : undefined });
       setSaving(false);
     }
   }

@@ -16,6 +16,7 @@
     "@saral/tokens": "workspace:*",
     "@supabase/supabase-js": "^2.106.1",
     "expo": "~54.0.0",
+    "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
     "expo-haptics": "~15.0.8",
     "expo-image-picker": "~17.0.11",
