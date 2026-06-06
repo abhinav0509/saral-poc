@@ -8,10 +8,14 @@ import {
   LayoutAnimation,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { Plus, X, Camera, Phone, MoreVertical } from "lucide-react-native";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { Plus, X, Camera, Phone, MoreVertical, MoreHorizontal, Clock, CalendarX } from "lucide-react-native";
 import { DropConfirmSheet } from "@/components/staff/DropConfirmSheet";
 import { RowActionsSheet } from "@/components/staff/RowActionsSheet";
+import { EmergencyBadge } from "@/components/staff/EmergencyBadge";
+import { RunningBehindSheet } from "@/components/staff/RunningBehindSheet";
+import { CancelDaySheet } from "@/components/staff/CancelDaySheet";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 
 // Where the patient live-visit page is hosted (used for the WhatsApp link).
 // TODO: point at the deployed patient web once it's live.
@@ -21,7 +25,12 @@ import {
   getActiveQueue,
   getTodayVisits,
   callIn,
+  bringInNow,
+  setEmergencyFlag,
   dropVisit,
+  bumpClinicDelay,
+  resetClinicDelay,
+  cancelRemainingToday,
   getSupabase,
   formatWaitTimer,
   formatEta,
@@ -48,6 +57,7 @@ type TabKey = "waiting" | "done" | "all";
 export default function QueueScreen() {
   const router = useRouter();
   const { show } = useToast();
+  const { runningBehind } = useLocalSearchParams<{ runningBehind?: string }>();
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [queue, setQueue] = useState<Visit[]>([]);
   const [todayAll, setTodayAll] = useState<Visit[]>([]);
@@ -59,6 +69,11 @@ export default function QueueScreen() {
   const [dropTarget, setDropTarget] = useState<Visit | null>(null);
   const [dropping, setDropping] = useState(false);
   const [menuTarget, setMenuTarget] = useState<Visit | null>(null);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [runningBehindOpen, setRunningBehindOpen] = useState(false);
+  const [cancelDayOpen, setCancelDayOpen] = useState(false);
+  const [delayBusy, setDelayBusy] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -100,7 +115,13 @@ export default function QueueScreen() {
     };
   }, [clinic, load]);
 
+  // Deep-linked from the "Push everyone's wait" step after adding an emergency.
+  useEffect(() => {
+    if (runningBehind === "1") setRunningBehindOpen(true);
+  }, [runningBehind]);
+
   const nowServing = queue.find((v) => v.status === "now_serving") ?? null;
+  const delayMinutes = clinic?.delay_minutes ?? 0;
   const waiting = useMemo(() => queue.filter((v) => v.status === "waiting"), [queue]);
   const done = useMemo(() => todayAll.filter((v) => v.status === "done"), [todayAll]);
   const list = tab === "waiting" ? waiting : tab === "done" ? done : todayAll;
@@ -116,6 +137,94 @@ export default function QueueScreen() {
       show({ tone: "error", title: "Couldn't call in", desc: e instanceof Error ? e.message : undefined });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleBringInNow(v: Visit) {
+    if (!clinic || busy) return;
+    setBusy(true);
+    haptics.success();
+    try {
+      await bringInNow(v.id, clinic.id);
+      show({
+        tone: "success",
+        title: `${v.token} is in the chair`,
+        desc: nowServing && nowServing.id !== v.id ? "The previous patient went back to the front." : `${v.patient_name} is now with the doctor`,
+      });
+    } catch (e) {
+      show({ tone: "error", title: "Couldn't bring in", desc: e instanceof Error ? e.message : undefined });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggleEmergency(v: Visit) {
+    const on = (v.priority ?? 0) === 0;
+    haptics.medium();
+    try {
+      await setEmergencyFlag(v.id, on);
+      show({
+        tone: on ? "info" : "info",
+        title: on ? `${v.token} marked emergency` : `Emergency flag removed`,
+        desc: on ? "Moved to the top of the queue." : `${v.patient_name} is back in normal order.`,
+      });
+    } catch (e) {
+      show({ tone: "error", title: "Couldn't update", desc: e instanceof Error ? e.message : undefined });
+    }
+  }
+
+  async function handleBumpDelay(minutes: number) {
+    if (!clinic || delayBusy) return;
+    setDelayBusy(true);
+    haptics.medium();
+    try {
+      const updated = await bumpClinicDelay(clinic.id, minutes);
+      setClinic(updated);
+      setRunningBehindOpen(false);
+      show({
+        tone: "info",
+        title: `Queue pushed +${minutes} min`,
+        desc: `Waiting patients now see ~${updated.delay_minutes} min added.`,
+      });
+    } catch (e) {
+      show({ tone: "error", title: "Couldn't update", desc: e instanceof Error ? e.message : undefined });
+    } finally {
+      setDelayBusy(false);
+    }
+  }
+
+  async function handleResetDelay() {
+    if (!clinic || delayBusy) return;
+    setDelayBusy(true);
+    haptics.success();
+    try {
+      const updated = await resetClinicDelay(clinic.id);
+      setClinic(updated);
+      setRunningBehindOpen(false);
+      show({ tone: "success", title: "Back on time", desc: "Waiting patients see normal wait times again." });
+    } catch (e) {
+      show({ tone: "error", title: "Couldn't update", desc: e instanceof Error ? e.message : undefined });
+    } finally {
+      setDelayBusy(false);
+    }
+  }
+
+  async function handleCancelDay() {
+    if (!clinic || cancelling) return;
+    setCancelling(true);
+    try {
+      const { cancelled } = await cancelRemainingToday(clinic.id);
+      setCancelDayOpen(false);
+      haptics.success();
+      show({
+        tone: "info",
+        title: cancelled > 0 ? `${cancelled} appointment${cancelled === 1 ? "" : "s"} cancelled` : "Nothing to cancel",
+        desc: cancelled > 0 ? "They've been told the clinic had to stop for today." : undefined,
+      });
+    } catch (e) {
+      show({ tone: "error", title: "Couldn't cancel", desc: e instanceof Error ? e.message : undefined });
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -184,7 +293,30 @@ export default function QueueScreen() {
           <Plus size={16} color="#fff" strokeWidth={2.5} />
           <Text className="text-label-sm font-semibold text-white">Walk-in</Text>
         </PressableScale>
+        <PressableScale
+          haptic="light"
+          onPress={() => setOverflowOpen(true)}
+          className="size-9 ml-1 items-center justify-center rounded-full"
+        >
+          <MoreHorizontal size={20} color={palette.muted} />
+        </PressableScale>
       </View>
+
+      {/* Running-behind banner */}
+      {delayMinutes > 0 && (
+        <PressableScale
+          haptic="light"
+          scaleTo={0.99}
+          onPress={() => setRunningBehindOpen(true)}
+          className="mx-4 mt-3 flex-row items-center gap-2.5 rounded-xl bg-amber-50 border border-amber-200 px-3.5 py-2.5"
+        >
+          <Clock size={16} color={palette.amber} />
+          <Text className="flex-1 text-caption text-text-secondary" numberOfLines={1}>
+            Running <Text className="font-semibold text-text-primary">~{delayMinutes} min</Text> behind — patients see the longer wait.
+          </Text>
+          <Text className="text-label-sm font-semibold text-text-brand">Adjust</Text>
+        </PressableScale>
+      )}
 
       {error ? (
         <View className="m-4 p-4 rounded-xl bg-surface-raised border border-border-subtle">
@@ -271,7 +403,7 @@ export default function QueueScreen() {
             tab === "waiting" ? (
               <QueueRow
                 visit={item}
-                eta={formatEta(minutesForQueueIndex(index))}
+                eta={formatEta(minutesForQueueIndex(index) + delayMinutes)}
                 onOpenHistory={() => openHistory(item)}
                 onDrop={() => confirmDrop(item)}
                 onMenu={() => setMenuTarget(item)}
@@ -304,11 +436,67 @@ export default function QueueScreen() {
 
       <RowActionsSheet
         visit={menuTarget}
-        onBringIn={() => menuTarget && handleCall(menuTarget)}
+        nowServingExists={!!nowServing}
+        onBringIn={() => menuTarget && handleBringInNow(menuTarget)}
+        onToggleEmergency={() => menuTarget && handleToggleEmergency(menuTarget)}
         onSendWhatsapp={() => menuTarget && handleSendWhatsapp(menuTarget)}
         onOpenHistory={() => menuTarget && openHistory(menuTarget)}
         onClose={() => setMenuTarget(null)}
       />
+
+      <RunningBehindSheet
+        visible={runningBehindOpen}
+        delayMinutes={delayMinutes}
+        pending={delayBusy}
+        onBump={handleBumpDelay}
+        onReset={handleResetDelay}
+        onClose={() => setRunningBehindOpen(false)}
+      />
+
+      <CancelDaySheet
+        visible={cancelDayOpen}
+        waitingCount={waiting.length}
+        pending={cancelling}
+        onConfirm={handleCancelDay}
+        onClose={() => setCancelDayOpen(false)}
+      />
+
+      {/* Queue overflow menu */}
+      <BottomSheet visible={overflowOpen} onClose={() => setOverflowOpen(false)}>
+        <View className="rounded-2xl border border-border-subtle overflow-hidden">
+          <PressableScale
+            haptic="light"
+            scaleTo={0.98}
+            onPress={() => {
+              setOverflowOpen(false);
+              setRunningBehindOpen(true);
+            }}
+            className="flex-row items-center gap-3 px-3.5 py-3.5 bg-surface-canvas"
+          >
+            <View className="w-5 items-center">
+              <Clock size={18} color={palette.amber} />
+            </View>
+            <Text className="text-label-md font-medium text-text-primary">
+              {delayMinutes > 0 ? `Running behind · ~${delayMinutes} min` : "Running behind"}
+            </Text>
+          </PressableScale>
+          <View className="h-px bg-border-subtle" />
+          <PressableScale
+            haptic="warning"
+            scaleTo={0.98}
+            onPress={() => {
+              setOverflowOpen(false);
+              setCancelDayOpen(true);
+            }}
+            className="flex-row items-center gap-3 px-3.5 py-3.5 bg-surface-canvas"
+          >
+            <View className="w-5 items-center">
+              <CalendarX size={18} color={palette.sindoor} />
+            </View>
+            <Text className="text-label-md font-medium text-text-critical">Cancel remaining today</Text>
+          </PressableScale>
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -366,6 +554,7 @@ function NowServingCard({
           <Text className="text-label-sm font-medium text-text-secondary uppercase tracking-wider">
             Live · Now serving
           </Text>
+          {visit.priority > 0 && <EmergencyBadge compact />}
         </View>
         <ConsultTimer startedAt={visit.started_at} />
       </View>
@@ -443,9 +632,12 @@ function QueueRow({
           </Text>
         </View>
         <View className="flex-1">
-          <Text className="text-label-lg font-semibold text-text-primary" numberOfLines={1}>
-            {visit.patient_name}
-          </Text>
+          <View className="flex-row items-center gap-1.5">
+            <Text className="text-label-lg font-semibold text-text-primary shrink" numberOfLines={1}>
+              {visit.patient_name}
+            </Text>
+            {visit.priority > 0 && <EmergencyBadge compact />}
+          </View>
           <View className="flex-row items-center gap-2 mt-1">
             <SourceBadge source={visit.source} />
             <View className="size-0.5 rounded-full" style={{ backgroundColor: palette.borderDefault }} />

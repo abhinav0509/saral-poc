@@ -1,5 +1,5 @@
 import { getSupabase } from "./client";
-import { minutesForAhead } from "../scheduling/eta";
+import { minutesForAhead, computeAhead } from "../scheduling/eta";
 import type {
   Clinic,
   Visit,
@@ -31,12 +31,23 @@ export async function getClinicByCode(code: string): Promise<Clinic | null> {
   return (data as Clinic | null) ?? null;
 }
 
+export async function getClinicById(clinicId: string): Promise<Clinic | null> {
+  const { data, error } = await getSupabase()
+    .from("clinics")
+    .select("*")
+    .eq("id", clinicId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as Clinic | null) ?? null;
+}
+
 export async function getActiveQueue(clinicId: string): Promise<Visit[]> {
   const { data, error } = await getSupabase()
     .from("visits")
     .select("*")
     .eq("clinic_id", clinicId)
     .in("status", ["now_serving", "waiting"])
+    .order("priority", { ascending: false })
     .order("joined_at", { ascending: true });
   if (error) throw error;
   return (data as Visit[] | null) ?? [];
@@ -288,13 +299,12 @@ export async function getQueueContext(visit: Visit): Promise<{
   etaMinutes: number;
   queue: Visit[];
 }> {
-  const queue = await getActiveQueue(visit.clinic_id);
-  const ordered = queue
-    .filter((v) => v.status === "waiting")
-    .sort((a, b) => a.joined_at.localeCompare(b.joined_at));
-  const idx = ordered.findIndex((v) => v.id === visit.id);
-  const aheadCount = visit.status === "now_serving" ? 0 : Math.max(0, idx);
-  const etaMinutes = minutesForAhead(aheadCount);
+  const [queue, clinic] = await Promise.all([
+    getActiveQueue(visit.clinic_id),
+    getClinicById(visit.clinic_id),
+  ]);
+  const aheadCount = computeAhead(visit, queue);
+  const etaMinutes = minutesForAhead(aheadCount, clinic?.delay_minutes ?? 0);
   return { aheadCount, etaMinutes, queue };
 }
 
@@ -328,6 +338,8 @@ interface CreateVisitInput {
   source: VisitSource;
   reason?: string | null;
   bookedFor?: string | null;
+  /** 0 = normal (default), 1 = emergency (jumps to the top of the queue). */
+  priority?: number;
 }
 
 /**
@@ -419,6 +431,7 @@ export async function createVisit(input: CreateVisitInput): Promise<Visit> {
       mobile: input.mobile,
       source: input.source,
       status: "waiting",
+      priority: input.priority ?? 0,
       reason: input.reason ?? null,
     })
     .select("*")
@@ -467,6 +480,46 @@ export async function callNext(clinicId: string): Promise<Visit | null> {
   const next = queue.find((v) => v.status === "waiting");
   if (!next) return null;
   return callIn(next.id, clinicId);
+}
+
+/**
+ * Interrupt the current consult for an emergency. The patient currently in
+ * the room (if any) is sent back to the front of the queue (status 'waiting',
+ * started_at cleared, priority/joined_at preserved so they're next after the
+ * emergency); the target visit becomes now_serving. Mirrors callIn's safe
+ * two-step against the one-now-serving partial unique index.
+ */
+export async function bringInNow(visitId: string, clinicId: string): Promise<Visit> {
+  const now = new Date().toISOString();
+  const sb = getSupabase();
+
+  await sb
+    .from("visits")
+    .update({ status: "waiting", started_at: null })
+    .eq("clinic_id", clinicId)
+    .eq("status", "now_serving")
+    .neq("id", visitId);
+
+  const { data, error } = await sb
+    .from("visits")
+    .update({ status: "now_serving", started_at: now })
+    .eq("id", visitId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Visit;
+}
+
+/** Promote a waiting visit to emergency (on) or de-escalate back to normal (off). */
+export async function setEmergencyFlag(visitId: string, on: boolean): Promise<Visit> {
+  const { data, error } = await getSupabase()
+    .from("visits")
+    .update({ priority: on ? 1 : 0 })
+    .eq("id", visitId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Visit;
 }
 
 export async function markVisitDone(visitId: string): Promise<Visit> {
@@ -634,4 +687,70 @@ export async function delayQueue(
     updated.push(data as Visit);
   }
   return { shifted: updated.length, visits: updated };
+}
+
+/* ============================================================
+   RUNNING BEHIND · clinic-wide ETA offset (the push-wait knob)
+   ============================================================ */
+
+const MAX_DELAY_MINUTES = 240;
+
+/**
+ * Add `minutes` to the clinic's running-behind offset (clamped to 0…240).
+ * Every waiting patient's live ETA = position*6 + delay_minutes, so this is
+ * how "the doctor is handling an emergency, push everyone back" becomes
+ * visible to patients. Returns the updated clinic.
+ */
+export async function bumpClinicDelay(clinicId: string, minutes: number): Promise<Clinic> {
+  const sb = getSupabase();
+  const current = await getClinicById(clinicId);
+  const next = Math.max(0, Math.min(MAX_DELAY_MINUTES, (current?.delay_minutes ?? 0) + minutes));
+  const { data, error } = await sb
+    .from("clinics")
+    .update({ delay_minutes: next, delay_set_at: next > 0 ? new Date().toISOString() : null })
+    .eq("id", clinicId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Clinic;
+}
+
+/** Clear the running-behind offset ("we're back on time"). */
+export async function resetClinicDelay(clinicId: string): Promise<Clinic> {
+  const { data, error } = await getSupabase()
+    .from("clinics")
+    .update({ delay_minutes: 0, delay_set_at: null })
+    .eq("id", clinicId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Clinic;
+}
+
+/* ============================================================
+   CANCEL REMAINING · stop the day after an emergency
+   ============================================================ */
+
+export interface CancelRemainingResult {
+  cancelled: number;
+}
+
+/**
+ * Drop every still-waiting patient for today (leaving the now_serving patient
+ * and finished visits untouched), tagging them with a cancel_reason so the
+ * patient page can show warm, specific copy. Used when an emergency forces the
+ * clinic to stop. Returns how many were cancelled.
+ */
+export async function cancelRemainingToday(
+  clinicId: string,
+  reason = "clinic_emergency",
+): Promise<CancelRemainingResult> {
+  const { data, error } = await getSupabase()
+    .from("visits")
+    .update({ status: "dropped", ended_at: new Date().toISOString(), cancel_reason: reason })
+    .eq("clinic_id", clinicId)
+    .eq("status", "waiting")
+    .select("id");
+  if (error) throw error;
+  return { cancelled: (data as { id: string }[] | null)?.length ?? 0 };
 }

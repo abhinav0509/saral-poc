@@ -37,6 +37,10 @@ export interface PublicVisit {
   gender: string | null;
   reason: string | null;
   status: VisitStatus;
+  /** 0 = normal, 1 = emergency. */
+  priority: number;
+  /** Set when dropped — 'clinic_emergency' drives the warm "clinic closed" copy. */
+  cancel_reason: string | null;
   booked_for: string | null;
   ended_at: string | null;
 }
@@ -45,7 +49,12 @@ export interface PublicVisitView {
   visit: PublicVisit;
   clinic: PublicClinic;
   ahead_count: number;
+  /** position*6 + clinic delay, computed server-side. */
   eta_minutes: number;
+  /** Clinic-wide "running behind" offset in minutes (0 when on time). */
+  clinic_delay_minutes: number;
+  /** Whether this visit itself is an emergency. */
+  is_emergency: boolean;
   mini_queue: MiniQueueEntry[];
   prescription: PublicPrescription | null;
 }

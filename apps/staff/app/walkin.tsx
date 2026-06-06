@@ -1,9 +1,18 @@
 import { useEffect, useState } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { getClinicByCode, createVisit, type Clinic } from "@saral/core";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import {
+  getClinicByCode,
+  getActiveQueue,
+  createVisit,
+  bringInNow,
+  type Clinic,
+  type Visit,
+} from "@saral/core";
 import { ScreenHeader } from "@/components/staff/ScreenHeader";
+import { EmergencyBadge } from "@/components/staff/EmergencyBadge";
+import { EmergencyAddedSheet } from "@/components/staff/EmergencyAddedSheet";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { PressableScale } from "@/components/ui/PressableScale";
@@ -17,13 +26,19 @@ const CLINIC_CODE = "drmehta";
 export default function WalkinScreen() {
   const router = useRouter();
   const { show } = useToast();
+  const { emergency } = useLocalSearchParams<{ emergency?: string }>();
+  const isEmergency = emergency === "1";
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<Gender | null>(null);
   const [mobile, setMobile] = useState("");
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState(isEmergency ? "Emergency" : "");
   const [saving, setSaving] = useState(false);
+  // Emergency post-add flow
+  const [added, setAdded] = useState<Visit | null>(null);
+  const [hasNowServing, setHasNowServing] = useState(false);
+  const [bringing, setBringing] = useState(false);
 
   useEffect(() => {
     (async () => setClinic(await getClinicByCode(CLINIC_CODE)))();
@@ -31,10 +46,17 @@ export default function WalkinScreen() {
 
   function validate(): string | null {
     if (name.trim().length < 2) return "Please enter the patient's name";
-    const a = parseInt(age, 10);
-    if (!Number.isFinite(a) || a < 0 || a > 120) return "Please enter a valid age";
-    if (!gender) return "Please pick a gender";
-    if (mobile.replace(/\D/g, "").length < 10) return "Please enter a 10-digit mobile";
+    // Emergency intake is name-first — everything else is optional so a patient
+    // in distress isn't held up by a form. Validate the rest only if provided.
+    if (!isEmergency) {
+      const a = parseInt(age, 10);
+      if (!Number.isFinite(a) || a < 0 || a > 120) return "Please enter a valid age";
+      if (!gender) return "Please pick a gender";
+      if (mobile.replace(/\D/g, "").length < 10) return "Please enter a 10-digit mobile";
+    } else if (age.trim()) {
+      const a = parseInt(age, 10);
+      if (!Number.isFinite(a) || a < 0 || a > 120) return "Please enter a valid age";
+    }
     return null;
   }
 
@@ -47,28 +69,54 @@ export default function WalkinScreen() {
     }
     if (!clinic || saving) return;
     setSaving(true);
+    const digits = mobile.replace(/\D/g, "").slice(-10);
     try {
-      await createVisit({
+      const visit = await createVisit({
         clinicId: clinic.id,
         patientName: name.trim(),
-        age: parseInt(age, 10),
+        age: age.trim() ? parseInt(age, 10) : null,
         gender,
-        mobile: mobile.replace(/\D/g, "").slice(-10),
+        mobile: digits.length === 10 ? digits : null,
         source: "qr",
+        priority: isEmergency ? 1 : 0,
         reason: reason.trim() || null,
       });
       haptics.success();
-      show({ tone: "success", title: `${name.trim()} added to the queue`, desc: "They'll show under Waiting." });
-      router.back();
+      if (isEmergency) {
+        // Don't navigate away — offer the escalations (interrupt / push wait).
+        const q = await getActiveQueue(clinic.id);
+        setHasNowServing(q.some((v) => v.status === "now_serving" && v.id !== visit.id));
+        setAdded(visit);
+        setSaving(false);
+      } else {
+        show({ tone: "success", title: `${name.trim()} added to the queue`, desc: "They'll show under Waiting." });
+        router.back();
+      }
     } catch (e) {
       show({ tone: "error", title: "Couldn't add", desc: e instanceof Error ? e.message : undefined });
       setSaving(false);
     }
   }
 
+  async function handleBringInNow() {
+    if (!clinic || !added || bringing) return;
+    setBringing(true);
+    try {
+      await bringInNow(added.id, clinic.id);
+      haptics.success();
+      router.replace("/queue");
+    } catch (e) {
+      show({ tone: "error", title: "Couldn't bring in", desc: e instanceof Error ? e.message : undefined });
+      setBringing(false);
+    }
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-surface-canvas" edges={["top", "bottom"]}>
-      <ScreenHeader title="Add walk-in" />
+      <ScreenHeader
+        title={isEmergency ? "Emergency walk-in" : "Add walk-in"}
+        right={isEmergency ? <View className="mr-2"><EmergencyBadge /></View> : undefined}
+      />
       <ScrollView
         className="flex-1"
         contentContainerClassName="p-4 gap-5"
@@ -76,12 +124,14 @@ export default function WalkinScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text className="text-body-sm text-text-secondary px-1 leading-relaxed">
-          Fill the patient&apos;s details — they join the queue right away with the next token.
+          {isEmergency
+            ? "Just the name gets them in — they jump to the top of the queue right away. Everything else is optional and can be filled in later."
+            : "Fill the patient's details — they join the queue right away with the next token."}
         </Text>
 
         <Input
           label="Full name"
-          placeholder="e.g. Riya Sharma"
+          placeholder={isEmergency ? "Name (or “Emergency patient”)" : "e.g. Riya Sharma"}
           value={name}
           onChangeText={setName}
           autoCapitalize="words"
@@ -92,7 +142,7 @@ export default function WalkinScreen() {
         <View className="flex-row gap-3">
           <View className="w-24">
             <Input
-              label="Age"
+              label={isEmergency ? "Age (opt.)" : "Age"}
               placeholder="34"
               keyboardType="number-pad"
               value={age}
@@ -102,7 +152,9 @@ export default function WalkinScreen() {
             />
           </View>
           <View className="flex-1 gap-1.5">
-            <Text className="text-label-md font-medium text-text-secondary">Gender</Text>
+            <Text className="text-label-md font-medium text-text-secondary">
+              {isEmergency ? "Gender (opt.)" : "Gender"}
+            </Text>
             <View className="flex-row gap-2">
               {(["Female", "Male", "Other"] as Gender[]).map((g) => {
                 const active = gender === g;
@@ -134,7 +186,7 @@ export default function WalkinScreen() {
         </View>
 
         <Input
-          label="Mobile number"
+          label={isEmergency ? "Mobile number (opt.)" : "Mobile number"}
           placeholder="10-digit mobile"
           keyboardType="phone-pad"
           value={mobile}
@@ -152,10 +204,27 @@ export default function WalkinScreen() {
       </ScrollView>
 
       <View className="p-4 border-t border-border-subtle">
-        <Button block size="lg" disabled={saving} onPress={onAdd}>
-          {saving ? "Adding…" : "Add to queue"}
+        <Button
+          block
+          size="lg"
+          variant={isEmergency ? "danger" : "primary"}
+          disabled={saving}
+          onPress={onAdd}
+        >
+          {saving ? "Adding…" : isEmergency ? "Add as emergency" : "Add to queue"}
         </Button>
       </View>
+
+      <EmergencyAddedSheet
+        visible={!!added}
+        token={added?.token ?? null}
+        patientName={added?.patient_name ?? ""}
+        hasNowServing={hasNowServing}
+        pending={bringing}
+        onBringInNow={handleBringInNow}
+        onPushWait={() => router.replace("/queue?runningBehind=1")}
+        onClose={() => router.replace("/queue")}
+      />
     </SafeAreaView>
   );
 }

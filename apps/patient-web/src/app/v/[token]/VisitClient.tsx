@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   Bell,
   MapPin,
@@ -45,8 +45,21 @@ export function VisitClient({ initialView }: VisitClientProps) {
   const clinic = view.clinic;
   const aheadCount = view.ahead_count;
   const etaMinutes = view.eta_minutes;
+  const clinicDelay = view.clinic_delay_minutes;
   const miniQueue = view.mini_queue;
   const prescription = view.prescription;
+
+  // Surface a gentle heads-up when the wait suddenly jumps (an emergency came
+  // in / the clinic pushed everyone back), so the longer ETA isn't a silent shock.
+  const prevEtaRef = useRef<number | null>(null);
+  const [waitJumped, setWaitJumped] = useState(false);
+  useEffect(() => {
+    const prev = prevEtaRef.current;
+    if (prev !== null && etaMinutes >= prev + 10 && visit.status === "waiting") {
+      setWaitJumped(true);
+    }
+    prevEtaRef.current = etaMinutes;
+  }, [etaMinutes, visit.status]);
 
   async function refresh() {
     try {
@@ -88,6 +101,16 @@ export function VisitClient({ initialView }: VisitClientProps) {
         },
         () => void refresh(),
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "clinics",
+          filter: `id=eq.${visit.clinic_id}`,
+        },
+        () => void refresh(),
+      )
       .subscribe();
     return () => {
       void channel.unsubscribe();
@@ -121,7 +144,7 @@ export function VisitClient({ initialView }: VisitClientProps) {
   // Visit dropped — apology + book again
   // --------------------------------------------------------
   if (visit.status === "dropped") {
-    return <DroppedView clinic={clinic} />;
+    return <DroppedView clinic={clinic} cancelReason={visit.cancel_reason} />;
   }
 
   // --------------------------------------------------------
@@ -257,20 +280,37 @@ export function VisitClient({ initialView }: VisitClientProps) {
           )}
         </Card>
 
-        {/* Reassurance card */}
-        {!isServing && (
-          <Card surface="raised" className="p-4 flex items-center gap-3">
-            <Bell size={20} className="text-text-accent flex-none" />
-            <div className="flex-1 min-w-0">
-              <p className="text-label-md font-semibold text-text-primary">
-                We&apos;ll buzz you 5 min before your turn
-              </p>
-              <p className="text-caption text-text-secondary">
-                Step out for chai — we&apos;ve got you.
-              </p>
-            </div>
-          </Card>
-        )}
+        {/* Reassurance card — warm "running behind" variant when the clinic is delayed */}
+        {!isServing &&
+          (clinicDelay > 0 ? (
+            <Card
+              surface="raised"
+              className="p-4 flex items-center gap-3 bg-amber-50 border border-amber-200"
+            >
+              <Clock size={20} className="text-amber-600 flex-none" />
+              <div className="flex-1 min-w-0">
+                <p className="text-label-md font-semibold text-text-primary">
+                  The clinic is handling an emergency
+                </p>
+                <p className="text-caption text-text-secondary">
+                  Your wait is a little longer than usual — thank you for your patience.
+                  We&apos;ll still buzz you before your turn.
+                </p>
+              </div>
+            </Card>
+          ) : (
+            <Card surface="raised" className="p-4 flex items-center gap-3">
+              <Bell size={20} className="text-text-accent flex-none" />
+              <div className="flex-1 min-w-0">
+                <p className="text-label-md font-semibold text-text-primary">
+                  We&apos;ll buzz you 5 min before your turn
+                </p>
+                <p className="text-caption text-text-secondary">
+                  Step out for chai — we&apos;ve got you.
+                </p>
+              </div>
+            </Card>
+          ))}
 
         {/* Actions row */}
         <div className="grid grid-cols-2 gap-3">
@@ -326,6 +366,16 @@ export function VisitClient({ initialView }: VisitClientProps) {
             description={errorMsg}
             onDismiss={() => setErrorMsg(null)}
             autoHide={5000}
+          />
+        )}
+
+        {waitJumped && (
+          <Toast
+            tone="info"
+            title="Your wait went up a bit"
+            description="An emergency came in at the clinic. Thanks for your patience."
+            onDismiss={() => setWaitJumped(false)}
+            autoHide={6000}
           />
         )}
 
@@ -556,18 +606,26 @@ function PostVisitView({
    Dropped state — patient cancelled or receptionist dropped
    ------------------------------------------------------------ */
 
-function DroppedView({ clinic }: { clinic: PublicClinic }) {
+function DroppedView({
+  clinic,
+  cancelReason,
+}: {
+  clinic: PublicClinic;
+  cancelReason: string | null;
+}) {
+  const clinicClosed = cancelReason === "clinic_emergency";
   return (
     <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas">
       <BrowserChrome url={`saral.live / ${clinic.code}`} />
       <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
         <SaralArch size={56} variant="mono-ink" />
         <h1 className="mt-6 text-h2 font-bold text-text-primary">
-          Visit cancelled
+          {clinicClosed ? "The clinic had to close" : "Visit cancelled"}
         </h1>
         <p className="mt-2 text-body-md text-text-secondary">
-          This token is no longer in the queue. If you&apos;d like to come back,
-          tap below to register again.
+          {clinicClosed
+            ? "An emergency meant the clinic had to stop earlier than planned today — we're so sorry for the trouble. Please book again and we'll see you soon."
+            : "This token is no longer in the queue. If you'd like to come back, tap below to register again."}
         </p>
         <Button
           variant="primary"
@@ -575,7 +633,7 @@ function DroppedView({ clinic }: { clinic: PublicClinic }) {
           className="mt-8"
           onClick={() => (window.location.href = `/walkin/${clinic.code}`)}
         >
-          Register again
+          {clinicClosed ? "Book again" : "Register again"}
         </Button>
       </div>
       <p className="text-caption text-text-tertiary text-center py-4">

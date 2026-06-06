@@ -3,9 +3,12 @@ import type { Visit } from "../db/types";
 /** Rough minutes-per-patient used across all ETA estimates. */
 export const PER_PATIENT_MINUTES = 6;
 
-/** ETA (minutes) for a patient with `aheadCount` people in front of them. */
-export function minutesForAhead(aheadCount: number): number {
-  return Math.max(0, aheadCount) * PER_PATIENT_MINUTES;
+/**
+ * ETA (minutes) for a patient with `aheadCount` people in front of them,
+ * plus any clinic-wide "running behind" delay.
+ */
+export function minutesForAhead(aheadCount: number, delayMinutes = 0): number {
+  return Math.max(0, aheadCount) * PER_PATIENT_MINUTES + Math.max(0, delayMinutes);
 }
 
 /** ETA (minutes) for the visit at 0-based queue position `idx`. */
@@ -36,12 +39,21 @@ export function formatWaitTimer(startedAtMs: number, nowMs: number): string | nu
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")} min`;
 }
 
+/**
+ * Sort the waiting queue the way the whole app orders it:
+ * emergencies first (priority DESC), then first-come-first-served (joined_at ASC).
+ */
+export function sortWaiting(visits: Visit[]): Visit[] {
+  return [...visits].sort(
+    (a, b) =>
+      (b.priority ?? 0) - (a.priority ?? 0) || a.joined_at.localeCompare(b.joined_at),
+  );
+}
+
 /** Pure ahead-count for a visit given the active queue (waiting + now_serving). */
 export function computeAhead(visit: Visit, queue: Visit[]): number {
   if (visit.status === "now_serving") return 0;
-  const ordered = queue
-    .filter((v) => v.status === "waiting")
-    .sort((a, b) => a.joined_at.localeCompare(b.joined_at));
+  const ordered = sortWaiting(queue.filter((v) => v.status === "waiting"));
   const idx = ordered.findIndex((v) => v.id === visit.id);
   return Math.max(0, idx);
 }

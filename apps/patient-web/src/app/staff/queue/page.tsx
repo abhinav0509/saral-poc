@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  HeartPulse,
 } from "lucide-react";
 import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
 import { DelaySheet } from "./DelaySheet";
@@ -628,9 +629,17 @@ function QueueRow({
           </span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-label-lg font-semibold text-text-primary truncate">
-            {visit.patient_name}
-          </p>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className="text-label-lg font-semibold text-text-primary truncate">
+              {visit.patient_name}
+            </p>
+            {visit.priority > 0 && (
+              <span className="inline-flex items-center gap-1 h-[18px] px-1.5 rounded-full bg-sindoor-50 text-text-critical text-label-sm font-semibold flex-none">
+                <HeartPulse size={11} strokeWidth={2.6} />
+                Emergency
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2 mt-1 min-w-0 text-caption text-text-tertiary">
             <SourceBadge source={sourceMap[visit.source]} />
             <span aria-hidden className="size-0.5 rounded-full bg-border-default flex-none" />

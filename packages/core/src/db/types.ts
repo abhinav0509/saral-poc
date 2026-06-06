@@ -12,6 +12,10 @@ export interface Clinic {
   name: string;
   address: string | null;
   doctor_name: string | null;
+  /** Clinic-wide "running behind" offset (minutes) added to every waiting patient's ETA. */
+  delay_minutes: number;
+  /** When the current delay was last set — for "running ~30m behind, since 2:15pm". */
+  delay_set_at: string | null;
   created_at: string;
 }
 
@@ -27,7 +31,11 @@ export interface Visit {
   mobile: string | null;
   source: VisitSource;
   status: VisitStatus;
+  /** 0 = normal, 1 = emergency. Queue sorts (priority DESC, joined_at ASC). */
+  priority: number;
   reason: string | null;
+  /** Why a dropped visit was cancelled — 'clinic_emergency' drives warm patient copy. */
+  cancel_reason: string | null;
   booked_for: string | null;
   joined_at: string;
   started_at: string | null;

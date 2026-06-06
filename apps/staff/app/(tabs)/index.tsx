@@ -27,6 +27,7 @@ import { LivePulse } from "@/components/ui/LivePulse";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { ShareLinkSheet } from "@/components/share/ShareLinkSheet";
+import { EmergencyBadge } from "@/components/staff/EmergencyBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
@@ -168,7 +169,10 @@ export default function HomeScreen() {
                   {nowServing.token}
                 </Text>
                 <View className="flex-1">
-                  <Text className="text-label-sm uppercase tracking-wider text-white/55">Now serving</Text>
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-label-sm uppercase tracking-wider text-white/55">Now serving</Text>
+                    {nowServing.priority > 0 && <EmergencyBadge compact />}
+                  </View>
                   <Text className="text-label-md font-semibold text-text-inverse mt-1" numberOfLines={1}>
                     {nowServing.patient_name}
                   </Text>
@@ -238,7 +242,7 @@ export default function HomeScreen() {
         onClose={() => setEmergencyOpen(false)}
         onWalkin={() => {
           setEmergencyOpen(false);
-          router.push("/walkin");
+          router.push("/walkin?emergency=1");
         }}
       />
 
@@ -286,9 +290,12 @@ function UpNextRow({ visit, eta }: { visit: Visit; eta: number }) {
         </Text>
       </View>
       <View className="flex-1">
-        <Text className="text-label-md font-semibold text-text-primary" numberOfLines={1}>
-          {visit.patient_name}
-        </Text>
+        <View className="flex-row items-center gap-1.5">
+          <Text className="text-label-md font-semibold text-text-primary shrink" numberOfLines={1}>
+            {visit.patient_name}
+          </Text>
+          {visit.priority > 0 && <EmergencyBadge compact />}
+        </View>
         <Text className="text-caption text-text-tertiary" numberOfLines={1}>
           {visit.source === "qr" ? "Walk-in" : visit.source === "online" ? "Online · Confirmed" : "Phone · Confirmed"}
           {visit.status === "waiting" ? ` · ${timeLabel}` : ""}
@@ -398,7 +405,7 @@ function EmergencySheet({
             </View>
             <View className="flex-1">
               <Text className="text-label-md font-semibold text-text-primary">Notify doctor</Text>
-              <Text className="text-caption text-text-secondary mt-0.5">High-priority ping to the in-room app</Text>
+              <Text className="text-caption text-text-secondary mt-0.5">A push to the in-room app — coming in v1.1</Text>
             </View>
             <ChevronRight size={18} color={palette.tertiary} />
           </PressableScale>
