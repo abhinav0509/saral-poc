@@ -36,7 +36,7 @@ const tnum = { fontVariant: ["tabular-nums" as const] };
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { clinic } = useActiveClinic();
+  const { clinic, userName } = useActiveClinic();
   const [today, setToday] = useState<Visit[]>([]);
   const [active, setActive] = useState<Visit[]>([]);
   const [now, setNow] = useState(() => new Date());
@@ -89,6 +89,8 @@ export default function HomeScreen() {
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const dateLabel = now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  const displayName = userName ?? clinic?.doctor_name ?? clinic?.name ?? "there";
+  const avatarInitial = (userName ?? clinic?.name ?? "S").trim().charAt(0).toUpperCase();
 
   return (
     <SafeAreaView className="flex-1 bg-surface-canvas" edges={["top"]}>
@@ -97,7 +99,7 @@ export default function HomeScreen() {
         <View className="px-5 pt-3 pb-3 flex-row items-start gap-3">
           <View className="flex-1">
             <Text className="text-body-sm text-text-secondary">{greeting},</Text>
-            <Text className="text-h2 font-bold text-text-primary">Phoolwati</Text>
+            <Text className="text-h2 font-bold text-text-primary" numberOfLines={1}>{displayName}</Text>
           </View>
           <PressableScale
             haptic="light"
@@ -108,7 +110,7 @@ export default function HomeScreen() {
             <Text className="text-label-sm font-semibold text-text-brand">Share link</Text>
           </PressableScale>
           <View className="size-10 rounded-full bg-surface-sunken border border-border-subtle items-center justify-center">
-            <Text className="text-label-md font-semibold text-text-primary">P</Text>
+            <Text className="text-label-md font-semibold text-text-primary">{avatarInitial}</Text>
           </View>
         </View>
 

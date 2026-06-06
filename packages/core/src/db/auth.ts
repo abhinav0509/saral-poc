@@ -34,6 +34,35 @@ export async function verifyOtp(phone: string, token: string): Promise<Session> 
   return data.session;
 }
 
+/**
+ * DEV ONLY — phone + password, no SMS provider required. Works when
+ * "Confirm phone" is disabled in Supabase (signup is auto-confirmed).
+ * Production uses signInWithOtp/verifyOtp above.
+ */
+export async function signUpWithPassword(phone: string, password: string): Promise<void> {
+  const { error } = await getSupabase().auth.signUp({ phone: toE164India(phone), password });
+  if (error) throw error;
+}
+
+export async function signInWithPassword(phone: string, password: string): Promise<void> {
+  const { error } = await getSupabase().auth.signInWithPassword({
+    phone: toE164India(phone),
+    password,
+  });
+  if (error) throw error;
+}
+
+// DEV ONLY — email + password (Phone provider needs an SMS backend; email doesn't).
+export async function signInWithEmailPassword(email: string, password: string): Promise<void> {
+  const { error } = await getSupabase().auth.signInWithPassword({ email: email.trim(), password });
+  if (error) throw error;
+}
+
+export async function signUpWithEmailPassword(email: string, password: string): Promise<void> {
+  const { error } = await getSupabase().auth.signUp({ email: email.trim(), password });
+  if (error) throw error;
+}
+
 export async function signOut(): Promise<void> {
   const { error } = await getSupabase().auth.signOut();
   if (error) throw error;

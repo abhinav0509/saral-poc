@@ -7,6 +7,38 @@ import type { Clinic, ClinicMembership, StaffRole } from "./types";
  * to the caller, so getMyMemberships needs no explicit user filter.
  */
 
+export interface MyProfile {
+  full_name: string | null;
+  phone: string | null;
+}
+
+/** The signed-in user's own profile row (RLS scopes it to them). */
+export async function getMyProfile(): Promise<MyProfile | null> {
+  const sb = getSupabase();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return null;
+  const { data, error } = await sb
+    .from("profiles")
+    .select("full_name, phone")
+    .eq("id", uid)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as MyProfile | null) ?? null;
+}
+
+/** Set the signed-in user's display name (upserts the profile row). */
+export async function updateMyName(fullName: string): Promise<void> {
+  const sb = getSupabase();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) throw new Error("Not signed in");
+  const { error } = await sb
+    .from("profiles")
+    .upsert({ id: uid, full_name: fullName.trim() }, { onConflict: "id" });
+  if (error) throw error;
+}
+
 export async function getMyMemberships(): Promise<ClinicMembership[]> {
   const sb = getSupabase();
   const { data: u } = await sb.auth.getUser();

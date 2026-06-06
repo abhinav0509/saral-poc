@@ -26,32 +26,36 @@ export default function RootLayout() {
 
 /**
  * Routes by auth state:
- *   no session            → (auth)/sign-in
- *   session, no clinic     → (auth)/onboarding
- *   session + clinic       → (tabs) / app screens
+ *   no session             → (auth)/sign-in
+ *   session, no name        → (auth)/name
+ *   session, no clinic      → (auth)/onboarding
+ *   session + name + clinic → (tabs) / app screens
  */
 function AuthGate() {
   const { session, loading: authLoading } = useAuth();
-  const { loading: clinicLoading, memberships } = useActiveClinic();
+  const { loading: clinicLoading, memberships, userName } = useActiveClinic();
   const segments = useSegments();
   const router = useRouter();
 
-  // Don't decide until auth is known, and (when signed in) memberships loaded.
+  // Don't decide until auth is known, and (when signed in) the profile loaded.
   const ready = !authLoading && (!session || !clinicLoading);
 
   useEffect(() => {
     if (!ready) return;
     const inAuth = segments[0] === "(auth)";
+    const onName = segments[1] === "name";
     const onOnboarding = segments[1] === "onboarding";
 
     if (!session) {
       if (!inAuth) router.replace("/(auth)/sign-in");
+    } else if (!userName) {
+      if (!onName) router.replace("/(auth)/name");
     } else if (memberships.length === 0) {
       if (!onOnboarding) router.replace("/(auth)/onboarding");
     } else if (inAuth) {
       router.replace("/(tabs)");
     }
-  }, [ready, session, memberships.length, segments, router]);
+  }, [ready, session, userName, memberships.length, segments, router]);
 
   if (!ready) {
     return (

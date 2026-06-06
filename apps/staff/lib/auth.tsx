@@ -15,6 +15,7 @@ import {
   onAuthChange,
   signOut as coreSignOut,
   getMyMemberships,
+  getMyProfile,
   type Clinic,
   type ClinicMembership,
   type StaffRole,
@@ -83,6 +84,8 @@ interface ClinicState {
   clinic: Clinic | null;
   clinicId: string | null;
   role: StaffRole | null;
+  /** The signed-in user's display name (profile full_name), or null if unset. */
+  userName: string | null;
   setActiveClinic: (id: string) => void;
   refresh: () => Promise<void>;
 }
@@ -92,19 +95,22 @@ export function ActiveClinicProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const [memberships, setMemberships] = useState<ClinicMembership[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!session) {
       setMemberships([]);
       setActiveId(null);
+      setUserName(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const mem = await getMyMemberships();
+      const [mem, profile] = await Promise.all([getMyMemberships(), getMyProfile()]);
       setMemberships(mem);
+      setUserName(profile?.full_name?.trim() || null);
       const ids = mem.map((m) => m.clinic.id);
       const stored = await AsyncStorage.getItem(ACTIVE_CLINIC_KEY);
       setActiveId(stored && ids.includes(stored) ? stored : (ids[0] ?? null));
@@ -132,6 +138,7 @@ export function ActiveClinicProvider({ children }: { children: ReactNode }) {
         clinic: active?.clinic ?? null,
         clinicId: active?.clinic.id ?? null,
         role: active?.role ?? null,
+        userName,
         setActiveClinic,
         refresh,
       }}
