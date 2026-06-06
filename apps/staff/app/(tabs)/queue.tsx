@@ -21,7 +21,6 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 // TODO: point at the deployed patient web once it's live.
 const PATIENT_WEB_BASE = "https://saral.vercel.app";
 import {
-  getClinicByCode,
   getActiveQueue,
   getTodayVisits,
   callIn,
@@ -35,7 +34,6 @@ import {
   formatWaitTimer,
   formatEta,
   minutesForQueueIndex,
-  type Clinic,
   type Visit,
 } from "@saral/core";
 import { Card } from "@/components/ui/Card";
@@ -46,11 +44,11 @@ import { PressableScale } from "@/components/ui/PressableScale";
 import { useToast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { SaralArch } from "@/components/brand/SaralArch";
+import { useActiveClinic } from "@/lib/auth";
 import { palette } from "@/lib/colors";
 import { haptics } from "@/lib/haptics";
 import { cn } from "@/lib/cn";
 
-const CLINIC_CODE = "drmehta";
 const tnum = { fontVariant: ["tabular-nums" as const] };
 type TabKey = "waiting" | "done" | "all";
 
@@ -58,7 +56,7 @@ export default function QueueScreen() {
   const router = useRouter();
   const { show } = useToast();
   const { runningBehind } = useLocalSearchParams<{ runningBehind?: string }>();
-  const [clinic, setClinic] = useState<Clinic | null>(null);
+  const { clinic, refresh: refreshClinic } = useActiveClinic();
   const [queue, setQueue] = useState<Visit[]>([]);
   const [todayAll, setTodayAll] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,14 +74,9 @@ export default function QueueScreen() {
   const [cancelling, setCancelling] = useState(false);
 
   const load = useCallback(async () => {
+    if (!clinic) return;
     try {
-      const c = await getClinicByCode(CLINIC_CODE);
-      if (!c) {
-        setError("Couldn't find Dr. Mehta's Clinic.");
-        return;
-      }
-      const [q, t] = await Promise.all([getActiveQueue(c.id), getTodayVisits(c.id)]);
-      setClinic(c);
+      const [q, t] = await Promise.all([getActiveQueue(clinic.id), getTodayVisits(clinic.id)]);
       // Smoothly animate rows in/out as the queue changes (call-in, drop, joins).
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setQueue(q);
@@ -94,7 +87,7 @@ export default function QueueScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clinic]);
 
   useEffect(() => {
     void load();
@@ -179,7 +172,7 @@ export default function QueueScreen() {
     haptics.medium();
     try {
       const updated = await bumpClinicDelay(clinic.id, minutes);
-      setClinic(updated);
+      await refreshClinic();
       setRunningBehindOpen(false);
       show({
         tone: "info",
@@ -198,8 +191,8 @@ export default function QueueScreen() {
     setDelayBusy(true);
     haptics.success();
     try {
-      const updated = await resetClinicDelay(clinic.id);
-      setClinic(updated);
+      await resetClinicDelay(clinic.id);
+      await refreshClinic();
       setRunningBehindOpen(false);
       show({ tone: "success", title: "Back on time", desc: "Waiting patients see normal wait times again." });
     } catch (e) {

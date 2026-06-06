@@ -1,15 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { View, Text, ScrollView, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Check, Calendar, Phone, Globe } from "lucide-react-native";
 import {
-  getClinicByCode,
   createBooking,
   SlotConflictError,
   combineDateTime,
   formatSlotTime,
-  type Clinic,
   type VisitSource,
   type SlotSelection,
 } from "@saral/core";
@@ -23,14 +21,14 @@ import { haptics } from "@/lib/haptics";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
 import { useToast } from "@/components/ui/toast";
+import { useActiveClinic } from "@/lib/auth";
 
-const CLINIC_CODE = "drmehta";
 type Gender = "Female" | "Male" | "Other";
 
 export default function NewBookingScreen() {
   const router = useRouter();
   const { show } = useToast();
-  const [clinic, setClinic] = useState<Clinic | null>(null);
+  const { clinic } = useActiveClinic();
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<Gender | null>(null);
@@ -41,10 +39,6 @@ export default function NewBookingScreen() {
   const [conflictHint, setConflictHint] = useState<{ time: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const pickerRef = useRef<SlotPickerHandle>(null);
-
-  useEffect(() => {
-    (async () => setClinic(await getClinicByCode(CLINIC_CODE)))();
-  }, []);
 
   function validate(): string | null {
     if (name.trim().length < 2) return "Please enter the patient's name";

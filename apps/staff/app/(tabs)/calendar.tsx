@@ -16,13 +16,11 @@ import {
   type LucideIcon,
 } from "lucide-react-native";
 import {
-  getClinicByCode,
   getVisitsBetween,
   getBlocksBetween,
   deleteBlock,
   getSupabase,
   isoLocalDate,
-  type Clinic,
   type Visit,
   type ClinicBlock,
   type BlockKind,
@@ -30,10 +28,10 @@ import {
 import { Card } from "@/components/ui/Card";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { BlockSheet } from "@/components/staff/BlockSheet";
+import { useActiveClinic } from "@/lib/auth";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
 
-const CLINIC_CODE = "drmehta";
 const HOURS = Array.from({ length: 11 }, (_, i) => i + 9); // 9 AM – 7 PM
 const tnum = { fontVariant: ["tabular-nums" as const] };
 
@@ -47,7 +45,7 @@ function startOfWeek(d: Date): Date {
 export default function CalendarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [clinic, setClinic] = useState<Clinic | null>(null);
+  const { clinic } = useActiveClinic();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [visits, setVisits] = useState<Visit[]>([]);
   const [blocks, setBlocks] = useState<ClinicBlock[]>([]);
@@ -67,10 +65,6 @@ export default function CalendarScreen() {
     return Math.max(0, Math.min(6, diff));
   });
   const selectedDay = days[selectedDayIdx]!;
-
-  useEffect(() => {
-    (async () => setClinic(await getClinicByCode(CLINIC_CODE)))();
-  }, []);
 
   const reload = useCallback(async () => {
     if (!clinic) return;

@@ -3,16 +3,16 @@ import { View, Text, ScrollView, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Phone, MoreHorizontal, Calendar, Camera } from "lucide-react-native";
-import { getClinicByCode, getPatientHistoryByMobile, type Visit } from "@saral/core";
+import { getPatientHistoryByMobile, type Visit } from "@saral/core";
 import { ScreenHeader } from "@/components/staff/ScreenHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useActiveClinic } from "@/lib/auth";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
 
-const CLINIC_CODE = "drmehta";
 const tnum = { fontVariant: ["tabular-nums" as const] };
 type Filter = "all" | "visits" | "rx" | "reports";
 const FILTERS: { key: Filter; label: string }[] = [
@@ -25,20 +25,16 @@ const FILTERS: { key: Filter; label: string }[] = [
 export default function PatientHistoryScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { clinic } = useActiveClinic();
   const [visits, setVisits] = useState<Visit[] | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
 
   useEffect(() => {
+    if (!id || !clinic) return;
     (async () => {
-      if (!id) return;
-      const c = await getClinicByCode(CLINIC_CODE);
-      if (!c) {
-        setVisits([]);
-        return;
-      }
-      setVisits(await getPatientHistoryByMobile(decodeURIComponent(id), c.id));
+      setVisits(await getPatientHistoryByMobile(decodeURIComponent(id), clinic.id));
     })();
-  }, [id]);
+  }, [id, clinic]);
 
   if (visits === null) {
     return (

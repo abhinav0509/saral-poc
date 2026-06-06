@@ -15,11 +15,9 @@ import {
   X,
 } from "lucide-react-native";
 import {
-  getClinicByCode,
   getTodayVisits,
   getActiveQueue,
   getSupabase,
-  type Clinic,
   type Visit,
 } from "@saral/core";
 import { Card } from "@/components/ui/Card";
@@ -29,16 +27,16 @@ import { PressableScale } from "@/components/ui/PressableScale";
 import { ShareLinkSheet } from "@/components/share/ShareLinkSheet";
 import { EmergencyBadge } from "@/components/staff/EmergencyBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useActiveClinic } from "@/lib/auth";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
 
-const CLINIC_CODE = "drmehta";
 const PATIENT_WEB_BASE = "https://saral.vercel.app";
 const tnum = { fontVariant: ["tabular-nums" as const] };
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [clinic, setClinic] = useState<Clinic | null>(null);
+  const { clinic } = useActiveClinic();
   const [today, setToday] = useState<Visit[]>([]);
   const [active, setActive] = useState<Visit[]>([]);
   const [now, setNow] = useState(() => new Date());
@@ -47,17 +45,15 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
+    if (!clinic) return;
     try {
-      const c = await getClinicByCode(CLINIC_CODE);
-      if (!c) return;
-      const [t, a] = await Promise.all([getTodayVisits(c.id), getActiveQueue(c.id)]);
-      setClinic(c);
+      const [t, a] = await Promise.all([getTodayVisits(clinic.id), getActiveQueue(clinic.id)]);
       setToday(t);
       setActive(a);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clinic]);
 
   useEffect(() => {
     void reload();

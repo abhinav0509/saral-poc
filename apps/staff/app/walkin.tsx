@@ -1,15 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import {
-  getClinicByCode,
-  getActiveQueue,
-  createVisit,
-  bringInNow,
-  type Clinic,
-  type Visit,
-} from "@saral/core";
+import { getActiveQueue, createVisit, bringInNow, type Visit } from "@saral/core";
 import { ScreenHeader } from "@/components/staff/ScreenHeader";
 import { EmergencyBadge } from "@/components/staff/EmergencyBadge";
 import { EmergencyAddedSheet } from "@/components/staff/EmergencyAddedSheet";
@@ -17,18 +10,18 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { useToast } from "@/components/ui/toast";
+import { useActiveClinic } from "@/lib/auth";
 import { haptics } from "@/lib/haptics";
 import { cn } from "@/lib/cn";
 
 type Gender = "Female" | "Male" | "Other";
-const CLINIC_CODE = "drmehta";
 
 export default function WalkinScreen() {
   const router = useRouter();
   const { show } = useToast();
+  const { clinic } = useActiveClinic();
   const { emergency } = useLocalSearchParams<{ emergency?: string }>();
   const isEmergency = emergency === "1";
-  const [clinic, setClinic] = useState<Clinic | null>(null);
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<Gender | null>(null);
@@ -39,10 +32,6 @@ export default function WalkinScreen() {
   const [added, setAdded] = useState<Visit | null>(null);
   const [hasNowServing, setHasNowServing] = useState(false);
   const [bringing, setBringing] = useState(false);
-
-  useEffect(() => {
-    (async () => setClinic(await getClinicByCode(CLINIC_CODE)))();
-  }, []);
 
   function validate(): string | null {
     if (name.trim().length < 2) return "Please enter the patient's name";

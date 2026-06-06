@@ -5,6 +5,13 @@
 
 export type VisitSource = "online" | "qr" | "phone";
 export type VisitStatus = "waiting" | "now_serving" | "done" | "dropped";
+export type StaffRole = "admin" | "doctor" | "receptionist";
+
+/** A user's membership of a clinic, with the clinic joined in. */
+export interface ClinicMembership {
+  role: StaffRole;
+  clinic: Clinic;
+}
 
 export interface Clinic {
   id: string;

@@ -3,29 +3,22 @@ import { View, Text, TextInput, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Search, X, ChevronRight, Users } from "lucide-react-native";
-import { getClinicByCode, searchPatients, type PatientSearchRow } from "@saral/core";
+import { searchPatients, type PatientSearchRow } from "@saral/core";
 import { Card } from "@/components/ui/Card";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useActiveClinic } from "@/lib/auth";
 import { palette } from "@/lib/colors";
 
-const CLINIC_CODE = "drmehta";
 const tnum = { fontVariant: ["tabular-nums" as const] };
 
 export default function SearchScreen() {
   const router = useRouter();
-  const [clinicId, setClinicId] = useState<string | null>(null);
+  const { clinicId } = useActiveClinic();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PatientSearchRow[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const c = await getClinicByCode(CLINIC_CODE);
-      setClinicId(c?.id ?? null);
-    })();
-  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);

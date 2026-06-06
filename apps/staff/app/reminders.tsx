@@ -2,12 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { View, Text, ScrollView, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BellRing, CheckCircle2, Phone } from "lucide-react-native";
-import {
-  getClinicByCode,
-  getPatientsWithFollowUps,
-  type Clinic,
-  type ReminderRow,
-} from "@saral/core";
+import { getPatientsWithFollowUps, type ReminderRow } from "@saral/core";
 import { ScreenHeader } from "@/components/staff/ScreenHeader";
 import { Card } from "@/components/ui/Card";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
@@ -15,33 +10,31 @@ import { PressableScale } from "@/components/ui/PressableScale";
 import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
 import { useToast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useActiveClinic } from "@/lib/auth";
 import { palette } from "@/lib/colors";
 import { haptics } from "@/lib/haptics";
 import { cn } from "@/lib/cn";
 
-const CLINIC_CODE = "drmehta";
 type Tab = "due" | "upcoming" | "sent";
 type Enriched = ReminderRow & { days: number | null; dueAt: Date | null };
 
 export default function RemindersScreen() {
   const { show } = useToast();
-  const [clinic, setClinic] = useState<Clinic | null>(null);
+  const { clinic } = useActiveClinic();
   const [reminders, setReminders] = useState<ReminderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("due");
 
   useEffect(() => {
+    if (!clinic) return;
     (async () => {
       try {
-        const c = await getClinicByCode(CLINIC_CODE);
-        if (!c) return;
-        setClinic(c);
-        setReminders(await getPatientsWithFollowUps(c.id));
+        setReminders(await getPatientsWithFollowUps(clinic.id));
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [clinic]);
 
   const enriched = useMemo<Enriched[]>(
     () =>
