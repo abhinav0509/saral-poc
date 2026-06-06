@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { PressableScale } from "@/components/ui/PressableScale";
+import { useToast } from "@/components/ui/toast";
 import { haptics } from "@/lib/haptics";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
@@ -48,6 +49,7 @@ function base64ToBytes(b64: string): Uint8Array {
 export default function SaveRxScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { show } = useToast();
   const [visit, setVisit] = useState<Visit | null>(null);
   const [nextToken, setNextToken] = useState<string | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -128,7 +130,7 @@ export default function SaveRxScreen() {
       haptics.success();
       router.back();
     } catch (e) {
-      Alert.alert("Couldn't save the prescription", e instanceof Error ? e.message : "");
+      show({ tone: "error", title: "Couldn't save the prescription", desc: e instanceof Error ? e.message : undefined });
       setSaving(false);
     }
   }

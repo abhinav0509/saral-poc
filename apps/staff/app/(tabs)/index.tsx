@@ -27,6 +27,7 @@ import { LivePulse } from "@/components/ui/LivePulse";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { ShareLinkSheet } from "@/components/share/ShareLinkSheet";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
 
@@ -42,14 +43,19 @@ export default function HomeScreen() {
   const [now, setNow] = useState(() => new Date());
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    const c = await getClinicByCode(CLINIC_CODE);
-    if (!c) return;
-    const [t, a] = await Promise.all([getTodayVisits(c.id), getActiveQueue(c.id)]);
-    setClinic(c);
-    setToday(t);
-    setActive(a);
+    try {
+      const c = await getClinicByCode(CLINIC_CODE);
+      if (!c) return;
+      const [t, a] = await Promise.all([getTodayVisits(c.id), getActiveQueue(c.id)]);
+      setClinic(c);
+      setToday(t);
+      setActive(a);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -120,12 +126,25 @@ export default function HomeScreen() {
 
         <View className="px-4 gap-5">
           {/* KPI tiles 2x2 */}
-          <View className="flex-row flex-wrap gap-3">
-            <Stat label="Booked" value={bookedToday} />
-            <Stat label="Waiting" value={waiting.length} live />
-            <Stat label="Walk-ins" value={walkInsToday} />
-            <Stat label="Avg wait today" value="14m" />
-          </View>
+          {loading ? (
+            <View className="gap-3">
+              <View className="flex-row gap-3">
+                <Skeleton className="flex-1 h-[92px] rounded-xl" />
+                <Skeleton className="flex-1 h-[92px] rounded-xl" />
+              </View>
+              <View className="flex-row gap-3">
+                <Skeleton className="flex-1 h-[92px] rounded-xl" />
+                <Skeleton className="flex-1 h-[92px] rounded-xl" />
+              </View>
+            </View>
+          ) : (
+            <View className="flex-row flex-wrap gap-3">
+              <Stat label="Booked" value={bookedToday} />
+              <Stat label="Waiting" value={waiting.length} live />
+              <Stat label="Walk-ins" value={walkInsToday} />
+              <Stat label="Avg wait today" value="14m" />
+            </View>
+          )}
 
           {/* No-show callout */}
           {noShowsToday > 0 && (
@@ -170,7 +189,13 @@ export default function HomeScreen() {
                 <Text className="text-label-md font-semibold text-text-brand">See all</Text>
               </PressableScale>
             </View>
-            {upNext.length === 0 ? (
+            {loading ? (
+              <View className="gap-2">
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} className="h-16 rounded-xl" />
+                ))}
+              </View>
+            ) : upNext.length === 0 ? (
               <Card surface="raised" className="p-5 items-center">
                 <Text className="text-body-sm text-text-secondary">No one waiting right now.</Text>
               </Card>

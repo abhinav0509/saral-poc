@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, ScrollView, Linking, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BellRing, CheckCircle2, Phone } from "lucide-react-native";
 import {
@@ -14,6 +14,7 @@ import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { WhatsAppIcon } from "@/components/brand/WhatsAppIcon";
 import { useToast } from "@/components/ui/toast";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { palette } from "@/lib/colors";
 import { haptics } from "@/lib/haptics";
 import { cn } from "@/lib/cn";
@@ -88,8 +89,12 @@ export default function RemindersScreen() {
     <SafeAreaView className="flex-1 bg-surface-canvas" edges={["top"]}>
       <ScreenHeader title="Send reminders" />
       {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={palette.brand} />
+        <View className="px-4 pt-4 gap-4">
+          <Skeleton className="h-[72px] rounded-xl" />
+          <Skeleton className="h-10 rounded-xl" />
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-[68px] rounded-xl" />
+          ))}
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerClassName="px-4 pt-4 pb-10 gap-4">

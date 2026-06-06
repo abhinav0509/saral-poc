@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { View, Text, ScrollView, Linking, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Phone, MoreHorizontal, Calendar, Camera } from "lucide-react-native";
@@ -8,6 +8,7 @@ import { ScreenHeader } from "@/components/staff/ScreenHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PressableScale } from "@/components/ui/PressableScale";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
 
@@ -43,8 +44,16 @@ export default function PatientHistoryScreen() {
     return (
       <SafeAreaView className="flex-1 bg-surface-canvas" edges={["top"]}>
         <ScreenHeader title="Patient" />
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={palette.brand} />
+        <View className="px-4 py-4 gap-4">
+          <Skeleton className="h-24 rounded-xl" />
+          <View className="flex-row gap-3">
+            <Skeleton className="flex-1 h-16 rounded-xl" />
+            <Skeleton className="flex-1 h-16 rounded-xl" />
+            <Skeleton className="flex-1 h-16 rounded-xl" />
+          </View>
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-16 rounded-xl" />
+          ))}
         </View>
       </SafeAreaView>
     );

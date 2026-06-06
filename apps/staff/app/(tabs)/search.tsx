@@ -6,6 +6,7 @@ import { Search, X, ChevronRight, Users } from "lucide-react-native";
 import { getClinicByCode, searchPatients, type PatientSearchRow } from "@saral/core";
 import { Card } from "@/components/ui/Card";
 import { PressableScale } from "@/components/ui/PressableScale";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { palette } from "@/lib/colors";
 
 const CLINIC_CODE = "drmehta";
@@ -99,7 +100,17 @@ export default function SearchScreen() {
             </Text>
           </Card>
         ) : loading ? (
-          <Text className="text-body-sm text-text-secondary text-center pt-8">Searching…</Text>
+          <View className="gap-2 mt-2">
+            {[0, 1, 2, 3].map((i) => (
+              <View key={i} className="flex-row items-center gap-3 p-3 rounded-xl bg-surface-raised border border-border-subtle">
+                <Skeleton className="size-11 rounded-full" />
+                <View className="flex-1 gap-2">
+                  <Skeleton className="h-3.5 w-1/2 rounded-md" />
+                  <Skeleton className="h-3 w-1/3 rounded-md" />
+                </View>
+              </View>
+            ))}
+          </View>
         ) : noMatches ? (
           <Card surface="raised" className="mt-4 p-6 items-center">
             <Text className="text-label-md font-semibold text-text-primary text-center">
