@@ -8,7 +8,8 @@ import {
   useState,
 } from "react";
 import { View, Text, ScrollView } from "react-native";
-import { Sun, Sunset, Moon, AlertTriangle, type LucideIcon } from "lucide-react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { Sun, Sunset, Moon, AlertTriangle, CalendarRange, type LucideIcon } from "lucide-react-native";
 import {
   getBookingsForDate,
   getBlocksForDate,
@@ -17,6 +18,7 @@ import {
   suggestSplits,
   formatSlotTime,
   buildDateStrip,
+  isoLocalDate,
   MORNING_SLOTS,
   AFTERNOON_SLOTS,
   EVENING_SLOTS,
@@ -32,6 +34,14 @@ import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
 
 const tnum = { fontVariant: ["tabular-nums" as const] };
+function customChipOf(iso: string) {
+  const d = new Date(`${iso}T00:00:00`);
+  return {
+    iso,
+    label: d.toLocaleDateString("en-IN", { weekday: "short" }),
+    sub: d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+  };
+}
 const emptyMap = (): BookedMap => ({
   takenSlots: new Set(),
   blockedSlots: new Set(),
@@ -64,6 +74,8 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => new Date());
   const [conflictSplits, setConflictSplits] = useState<{ takenTime: string; options: string[] } | null>(null);
+  const [customDate, setCustomDate] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const autoSelectedRef = useRef(false);
 
   useEffect(() => {
@@ -175,13 +187,46 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
   ];
   const visibleSections = sections.filter((s) => !isToday || !s.slots.every(slotIsPast));
 
+  const dateChips =
+    customDate && !dateStrip.some((d) => d.iso === customDate)
+      ? [...dateStrip, customChipOf(customDate)]
+      : dateStrip;
+
   return (
     <View className="gap-4">
       {daysAhead > 1 && (
         <View className="gap-2">
-          <Text className="text-label-md font-medium text-text-secondary px-1">Pick a date</Text>
+          <View className="flex-row items-center justify-between px-1">
+            <Text className="text-label-md font-medium text-text-secondary">Pick a date</Text>
+            <PressableScale
+              haptic="light"
+              onPress={() => setShowDatePicker(true)}
+              className="flex-row items-center gap-1.5"
+            >
+              <CalendarRange size={14} color={palette.brand} />
+              <Text className="text-label-sm font-semibold text-text-brand">Pick date</Text>
+            </PressableScale>
+          </View>
+          {showDatePicker && (
+            <DateTimePicker
+              value={new Date(`${selectedDate}T00:00:00`)}
+              mode="date"
+              minimumDate={new Date(`${isoLocalDate(new Date())}T00:00:00`)}
+              onChange={(_, d) => {
+                setShowDatePicker(false);
+                if (d) {
+                  const iso = isoLocalDate(d);
+                  setCustomDate(iso);
+                  setSelectedDate(iso);
+                  onChange(null);
+                  setConflictSplits(null);
+                  autoSelectedRef.current = false;
+                }
+              }}
+            />
+          )}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-0.5">
-            {dateStrip.map((d) => {
+            {dateChips.map((d) => {
               const active = selectedDate === d.iso;
               const [dd, mm] = d.sub.split(" ");
               return (

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
   Linking,
   LayoutAnimation,
@@ -36,6 +35,7 @@ import { SourceBadge } from "@/components/ui/SourceBadge";
 import { LivePulse } from "@/components/ui/LivePulse";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { useToast } from "@/components/ui/toast";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { palette } from "@/lib/colors";
 import { haptics } from "@/lib/haptics";
@@ -192,9 +192,7 @@ export default function QueueScreen() {
           <Text className="text-body-sm text-text-secondary">{error}</Text>
         </View>
       ) : loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={palette.brand} />
-        </View>
+        <QueueSkeleton />
       ) : (
         <FlatList
           data={list}
@@ -312,6 +310,27 @@ export default function QueueScreen() {
         onClose={() => setMenuTarget(null)}
       />
     </SafeAreaView>
+  );
+}
+
+/* ---------------- Loading skeleton ---------------- */
+
+function QueueSkeleton() {
+  return (
+    <View className="px-4 pt-4 gap-4">
+      <Skeleton className="h-44 rounded-2xl" />
+      <Skeleton className="h-10 rounded-xl" />
+      {[0, 1, 2, 3].map((i) => (
+        <View key={i} className="flex-row items-center gap-3 py-1">
+          <Skeleton className="size-11" />
+          <View className="flex-1 gap-2">
+            <Skeleton className="h-3.5 w-1/2 rounded-md" />
+            <Skeleton className="h-3 w-1/3 rounded-md" />
+          </View>
+          <Skeleton className="size-9 rounded-full" />
+        </View>
+      ))}
+    </View>
   );
 }
 
