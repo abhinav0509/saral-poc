@@ -17,9 +17,7 @@ import { RunningBehindSheet } from "@/components/staff/RunningBehindSheet";
 import { CancelDaySheet } from "@/components/staff/CancelDaySheet";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 
-// Where the patient live-visit page is hosted (used for the WhatsApp link).
-// TODO: point at the deployed patient web once it's live.
-const PATIENT_WEB_BASE = "https://saral.vercel.app";
+import { PATIENT_WEB_BASE } from "@/lib/config";
 import {
   getActiveQueue,
   getTodayVisits,

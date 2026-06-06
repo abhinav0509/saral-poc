@@ -28,10 +28,10 @@ import { ShareLinkSheet } from "@/components/share/ShareLinkSheet";
 import { EmergencyBadge } from "@/components/staff/EmergencyBadge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useActiveClinic } from "@/lib/auth";
+import { PATIENT_WEB_BASE } from "@/lib/config";
 import { palette } from "@/lib/colors";
 import { cn } from "@/lib/cn";
 
-const PATIENT_WEB_BASE = "https://saral.vercel.app";
 const tnum = { fontVariant: ["tabular-nums" as const] };
 
 export default function HomeScreen() {
