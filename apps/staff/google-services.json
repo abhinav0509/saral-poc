@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1014036927299",
+    "project_id": "saral-1c711",
+    "storage_bucket": "saral-1c711.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1014036927299:android:9ec60469dea9dbd12c95f6",
+        "android_client_info": {
+          "package_name": "com.saral.staff"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDM3n2uAjNuTzZHU1qQDNd_I4EdknzYWoc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -16,7 +16,8 @@
     },
     "android": {
       "edgeToEdgeEnabled": true,
-      "package": "com.saral.staff"
+      "package": "com.saral.staff",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
