@@ -50,9 +50,11 @@ enabled = true
 port = 54323
 
 # Edge Functions (Phase 4 notifications).
-# dispatch-outbox: invoked by pg_cron/pg_net with a service-role bearer.
+# dispatch-outbox: invoked by the message_outbox Database Webhook. verify_jwt
+# is OFF because the project uses the new (non-JWT) key format; the function
+# takes no input and only drains already-enqueued rows, so this is safe.
 [functions.dispatch-outbox]
-verify_jwt = true
+verify_jwt = false
 
 # whatsapp-webhook: called by Meta (no Supabase JWT) — verified via hub token.
 [functions.whatsapp-webhook]

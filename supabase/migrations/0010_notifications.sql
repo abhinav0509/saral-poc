@@ -6,17 +6,10 @@
 -- -guarded). WhatsApp rows sit `pending` until the Edge function has the
 -- WhatsApp secrets — i.e. the pipeline is dormant-but-wired until approval.
 --
--- After applying: enable the `pg_cron` + `pg_net` extensions (Dashboard →
--- Database → Extensions), set the two settings below, and deploy the functions.
+-- After applying: deploy the Edge Functions and create a Database Webhook on
+-- message_outbox (INSERT) → dispatch-outbox (Dashboard → Database → Webhooks).
+-- That webhook is what drains the outbox; no pg_cron/pg_net needed.
 -- ============================================================
-
--- ---------- extensions (pg_net usually on; pg_cron may need dashboard enable) ----------
-CREATE EXTENSION IF NOT EXISTS pg_net;
-DO $$ BEGIN
-  CREATE EXTENSION IF NOT EXISTS pg_cron;
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE '[saral] enable pg_cron in the dashboard, then re-run the cron.schedule block at the bottom';
-END $$;
 
 -- ---------- device_push_tokens ----------
 CREATE TABLE IF NOT EXISTS device_push_tokens (
@@ -73,23 +66,6 @@ CREATE OR REPLACE FUNCTION saral_e164(p_mobile text)
     THEN '+91' || right(regexp_replace(p_mobile, '\D', '', 'g'), 10)
     ELSE NULL END
 $$;
-
--- Best-effort: nudge the dispatcher immediately via pg_net (no-op until the two
--- settings are configured; the pg_cron sweep is the backstop either way).
-CREATE OR REPLACE FUNCTION wake_dispatch()
-  RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_url text := current_setting('app.dispatch_url', true);
-        v_key text := current_setting('app.dispatch_token', true);
-BEGIN
-  IF coalesce(v_url, '') = '' THEN RETURN; END IF;
-  PERFORM net.http_post(
-    url := v_url,
-    headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer '||coalesce(v_key,'')),
-    body := '{}'::jsonb
-  );
-EXCEPTION WHEN OTHERS THEN
-  RAISE WARNING '[saral] wake_dispatch failed: %', SQLERRM;
-END $$;
 
 CREATE OR REPLACE FUNCTION enqueue_message(
   p_clinic uuid, p_visit uuid, p_channel text, p_recipient text,
@@ -158,7 +134,6 @@ BEGIN
       'confirm:'||NEW.id::text);
   END IF;
 
-  PERFORM wake_dispatch();
   RETURN NULL;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING '[saral] notify_visit_insert failed: %', SQLERRM;
@@ -215,7 +190,6 @@ BEGIN
     END LOOP;
   END IF;
 
-  PERFORM wake_dispatch();
   RETURN NULL;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING '[saral] notify_visit_update failed: %', SQLERRM;
@@ -240,7 +214,6 @@ BEGIN
       'fallback_text','Namaste '||v_first||', your prescription from '||coalesce(v_clinic_name,'the clinic')||
                       ' is ready. View it here: '||v_url),
     'rx:'||NEW.id::text);
-  PERFORM wake_dispatch();
   RETURN NULL;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING '[saral] notify_prescription_insert failed: %', SQLERRM;
@@ -265,8 +238,7 @@ BEGIN
           'delay:'||NEW.id::text||':'||v_stamp||':'||r.id::text);
       END IF;
     END LOOP;
-    PERFORM wake_dispatch();
-  END IF;
+    END IF;
   RETURN NULL;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING '[saral] notify_clinic_update failed: %', SQLERRM;
@@ -286,14 +258,5 @@ DROP TRIGGER IF EXISTS clinics_notify_update ON clinics;
 CREATE TRIGGER clinics_notify_update AFTER UPDATE ON clinics
   FOR EACH ROW EXECUTE FUNCTION notify_clinic_update();
 
--- ============================================================
--- pg_cron sweep (retry/backstop) + daily follow-up reminders.
--- Requires pg_cron enabled + these settings:
---   ALTER DATABASE postgres SET app.dispatch_url   = 'https://<ref>.supabase.co/functions/v1/dispatch-outbox';
---   ALTER DATABASE postgres SET app.dispatch_token = '<service-role-or-anon-jwt>';
--- ============================================================
-DO $$ BEGIN
-  PERFORM cron.schedule('saral-dispatch-sweep', '* * * * *', $cron$ SELECT wake_dispatch() $cron$);
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE '[saral] cron.schedule skipped (enable pg_cron, then run it manually)';
-END $$;
+-- Dispatch is driven by a Database Webhook on message_outbox (INSERT) →
+-- dispatch-outbox. Retrying *failed* sends (a cron sweep) is a later add-on.
