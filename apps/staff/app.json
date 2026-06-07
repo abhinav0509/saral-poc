@@ -34,6 +34,13 @@
     "experiments": {
       "typedRoutes": true,
       "tsconfigPaths": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "db31682f-8bb8-4701-bc86-e402f3f5a37b"
+      }
+    },
+    "owner": "abhinav-davinci"
   }
 }
