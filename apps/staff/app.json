@@ -52,6 +52,12 @@
         "projectId": "db31682f-8bb8-4701-bc86-e402f3f5a37b"
       }
     },
-    "owner": "abhinav-davinci"
+    "owner": "abhinav-davinci",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/db31682f-8bb8-4701-bc86-e402f3f5a37b"
+    }
   }
 }
