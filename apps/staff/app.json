@@ -11,17 +11,25 @@
       "backgroundColor": "#0E5E5A"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.saral.staff"
     },
     "android": {
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.saral.staff"
     },
     "web": {
       "bundler": "metro",
       "output": "single"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#0E5E5A"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
