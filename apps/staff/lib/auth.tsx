@@ -16,6 +16,7 @@ import {
   signOut as coreSignOut,
   getMyMemberships,
   getMyProfile,
+  acceptMyInvites,
   type Clinic,
   type ClinicMembership,
   type StaffRole,
@@ -108,6 +109,9 @@ export function ActiveClinicProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     try {
+      // Link any pending phone invites first, so a freshly-invited user's
+      // membership exists by the time we read it.
+      await acceptMyInvites().catch(() => {});
       const [mem, profile] = await Promise.all([getMyMemberships(), getMyProfile()]);
       setMemberships(mem);
       setUserName(profile?.full_name?.trim() || null);

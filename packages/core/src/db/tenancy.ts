@@ -27,6 +27,16 @@ export async function getMyProfile(): Promise<MyProfile | null> {
   return (data as MyProfile | null) ?? null;
 }
 
+/**
+ * Link any pending phone invites for the signed-in user (run on login).
+ * Replaces the privilege-blocked auth.users trigger. Returns rows touched.
+ */
+export async function acceptMyInvites(): Promise<number> {
+  const { data, error } = await getSupabase().rpc("accept_my_invites");
+  if (error) throw error;
+  return (data as number | null) ?? 0;
+}
+
 /** Set the signed-in user's display name (upserts the profile row). */
 export async function updateMyName(fullName: string): Promise<void> {
   const sb = getSupabase();

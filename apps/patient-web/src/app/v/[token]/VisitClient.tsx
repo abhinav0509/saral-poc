@@ -77,46 +77,20 @@ export function VisitClient({ initialView }: VisitClientProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visit.public_token]);
 
-  // Realtime: refresh on any visit change in our clinic, or our prescription.
+  // Realtime via Broadcast: after the RLS flip anon can't read tables, so we
+  // can't use postgres_changes. A DB trigger emits a PII-free "clinic_changed"
+  // signal to a public per-clinic topic; we just refetch through the RPC.
+  // (The 30s poll above is the guaranteed fallback if broadcast doesn't land.)
   useEffect(() => {
     const channel = getSupabase()
-      .channel(`patient:${visit.clinic_id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "visits",
-          filter: `clinic_id=eq.${visit.clinic_id}`,
-        },
-        () => void refresh(),
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "prescriptions",
-          filter: `visit_id=eq.${visit.id}`,
-        },
-        () => void refresh(),
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "clinics",
-          filter: `id=eq.${visit.clinic_id}`,
-        },
-        () => void refresh(),
-      )
+      .channel(`clinic:${visit.clinic_id}`)
+      .on("broadcast", { event: "clinic_changed" }, () => void refresh())
       .subscribe();
     return () => {
       void channel.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visit.id, visit.clinic_id]);
+  }, [visit.clinic_id]);
 
   function onCancel() {
     setConfirmingCancel(false);
