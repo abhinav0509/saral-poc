@@ -15,6 +15,7 @@ import { ScreenHeader } from "@/components/staff/ScreenHeader";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { KeyboardAvoider } from "@/components/ui/KeyboardAvoider";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { SlotPicker, type SlotPickerHandle } from "@/components/booking/SlotPicker";
 import { haptics } from "@/lib/haptics";
@@ -95,7 +96,7 @@ export default function NewBookingScreen() {
           <ActivityIndicator color={palette.brand} />
         </View>
       ) : (
-        <>
+        <KeyboardAvoider>
           <ScrollView
             className="flex-1"
             contentContainerClassName="px-4 py-5 gap-5"
@@ -236,7 +237,7 @@ export default function NewBookingScreen() {
               {saving ? "Saving…" : slot ? "Confirm booking" : "Pick a slot to continue"}
             </Button>
           </View>
-        </>
+        </KeyboardAvoider>
       )}
     </SafeAreaView>
   );

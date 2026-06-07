@@ -23,6 +23,7 @@ import {
 } from "@saral/core";
 import { ScreenHeader } from "@/components/staff/ScreenHeader";
 import { Button } from "@/components/ui/Button";
+import { KeyboardAvoider } from "@/components/ui/KeyboardAvoider";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { PressableScale } from "@/components/ui/PressableScale";
@@ -148,7 +149,7 @@ export default function SaveRxScreen() {
           <ActivityIndicator color={palette.brand} />
         </View>
       ) : (
-        <>
+        <KeyboardAvoider>
           <ScrollView
             className="flex-1"
             contentContainerClassName="px-4 pt-4 pb-6 gap-4"
@@ -311,7 +312,7 @@ export default function SaveRxScreen() {
               {saving ? "Saving…" : nextToken ? `Save & call next → ${nextToken}` : "Save & finish"}
             </Button>
           </View>
-        </>
+        </KeyboardAvoider>
       )}
     </SafeAreaView>
   );

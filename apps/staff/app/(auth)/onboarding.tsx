@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { createClinicAndAdmin } from "@saral/core";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { KeyboardAvoider } from "@/components/ui/KeyboardAvoider";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { useToast } from "@/components/ui/toast";
 import { useAuth, useActiveClinic } from "@/lib/auth";
@@ -52,6 +53,7 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface-canvas" edges={["top", "bottom"]}>
+      <KeyboardAvoider>
       <ScrollView
         className="flex-1"
         contentContainerClassName="p-6 gap-6"
@@ -113,6 +115,7 @@ export default function OnboardingScreen() {
           </PressableScale>
         </View>
       </ScrollView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

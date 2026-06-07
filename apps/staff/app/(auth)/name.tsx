@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { View, Text, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { updateMyName } from "@saral/core";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { KeyboardAvoider } from "@/components/ui/KeyboardAvoider";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { useToast } from "@/components/ui/toast";
 import { useAuth, useActiveClinic } from "@/lib/auth";
@@ -33,10 +34,7 @@ export default function NameScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface-canvas" edges={["top", "bottom"]}>
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardAvoider>
         <View className="flex-1 px-6 justify-center gap-8">
           <View className="gap-1">
             <Text className="text-h1 font-bold text-text-primary">What&apos;s your name?</Text>
@@ -69,7 +67,7 @@ export default function NameScreen() {
             </PressableScale>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, KeyboardAvoidingView, Platform, TextInput } from "react-native";
+import { View, Text, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
 import { signInWithOtp, verifyOtp } from "@saral/core";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { KeyboardAvoider } from "@/components/ui/KeyboardAvoider";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { useToast } from "@/components/ui/toast";
 import { palette } from "@/lib/colors";
@@ -70,10 +71,7 @@ export default function VerifyScreen() {
         </PressableScale>
       </View>
 
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardAvoider>
         <View className="flex-1 px-6 gap-8 pt-4">
           <View className="gap-1">
             <Text className="text-h1 font-bold text-text-primary">Enter the code</Text>
@@ -112,7 +110,7 @@ export default function VerifyScreen() {
             </PressableScale>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

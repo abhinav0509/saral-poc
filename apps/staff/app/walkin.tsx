@@ -8,6 +8,7 @@ import { EmergencyBadge } from "@/components/staff/EmergencyBadge";
 import { EmergencyAddedSheet } from "@/components/staff/EmergencyAddedSheet";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { KeyboardAvoider } from "@/components/ui/KeyboardAvoider";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { useToast } from "@/components/ui/toast";
 import { useActiveClinic } from "@/lib/auth";
@@ -106,6 +107,7 @@ export default function WalkinScreen() {
         title={isEmergency ? "Emergency walk-in" : "Add walk-in"}
         right={isEmergency ? <View className="mr-2"><EmergencyBadge /></View> : undefined}
       />
+      <KeyboardAvoider>
       <ScrollView
         className="flex-1"
         contentContainerClassName="p-4 gap-5"
@@ -203,6 +205,7 @@ export default function WalkinScreen() {
           {saving ? "Adding…" : isEmergency ? "Add as emergency" : "Add to queue"}
         </Button>
       </View>
+      </KeyboardAvoider>
 
       <EmergencyAddedSheet
         visible={!!added}
