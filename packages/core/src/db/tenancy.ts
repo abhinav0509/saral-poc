@@ -37,6 +37,33 @@ export async function acceptMyInvites(): Promise<number> {
   return (data as number | null) ?? 0;
 }
 
+/** Register/refresh this device's Expo push token for the active clinic. */
+export async function upsertPushToken(
+  clinicId: string,
+  expoToken: string,
+  platform: string,
+): Promise<void> {
+  const sb = getSupabase();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return;
+  const { error } = await sb.from("device_push_tokens").upsert(
+    { user_id: uid, clinic_id: clinicId, expo_token: expoToken, platform, updated_at: new Date().toISOString() },
+    { onConflict: "user_id,clinic_id,expo_token" },
+  );
+  if (error) throw error;
+}
+
+/** Drop all of this user's push tokens (on sign-out). */
+export async function removeMyPushTokens(): Promise<void> {
+  const sb = getSupabase();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return;
+  const { error } = await sb.from("device_push_tokens").delete().eq("user_id", uid);
+  if (error) throw error;
+}
+
 /** Set the signed-in user's display name (upserts the profile row). */
 export async function updateMyName(fullName: string): Promise<void> {
   const sb = getSupabase();

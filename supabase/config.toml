@@ -48,3 +48,12 @@ enable_confirmations = true
 [studio]
 enabled = true
 port = 54323
+
+# Edge Functions (Phase 4 notifications).
+# dispatch-outbox: invoked by pg_cron/pg_net with a service-role bearer.
+[functions.dispatch-outbox]
+verify_jwt = true
+
+# whatsapp-webhook: called by Meta (no Supabase JWT) — verified via hub token.
+[functions.whatsapp-webhook]
+verify_jwt = false

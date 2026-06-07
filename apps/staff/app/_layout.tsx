@@ -7,6 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { SessionProvider, ActiveClinicProvider, useAuth, useActiveClinic } from "@/lib/auth";
+import { addPushTapListener } from "@/lib/push";
 import { palette } from "@/lib/colors";
 
 export default function RootLayout() {
@@ -39,6 +40,12 @@ function AuthGate() {
 
   // Don't decide until auth is known, and (when signed in) the profile loaded.
   const ready = !authLoading && (!session || !clinicLoading);
+
+  // Route to the right screen when a push notification is tapped.
+  useEffect(() => {
+    const sub = addPushTapListener((route) => router.push(route as Parameters<typeof router.push>[0]));
+    return () => sub.remove();
+  }, [router]);
 
   useEffect(() => {
     if (!ready) return;

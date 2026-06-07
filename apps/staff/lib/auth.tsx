@@ -17,10 +17,12 @@ import {
   getMyMemberships,
   getMyProfile,
   acceptMyInvites,
+  removeMyPushTokens,
   type Clinic,
   type ClinicMembership,
   type StaffRole,
 } from "@saral/core";
+import { registerForPush } from "@/lib/push";
 
 const ACTIVE_CLINIC_KEY = "saral.activeClinicId";
 
@@ -62,8 +64,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    // Always clear the local active-clinic pref (shared-device hygiene), even
-    // if the network sign-out errors.
+    // Drop this device's push tokens while the session is still valid, then
+    // clear local state (shared-device hygiene) even if network sign-out errors.
+    await removeMyPushTokens().catch(() => {});
     await Promise.allSettled([coreSignOut(), AsyncStorage.removeItem(ACTIVE_CLINIC_KEY)]);
   }, []);
 
@@ -135,6 +138,12 @@ export function ActiveClinicProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const active = memberships.find((m) => m.clinic.id === activeId) ?? null;
+  const clinicId = active?.clinic.id ?? null;
+
+  // Register this device for push once we know the active clinic (best-effort).
+  useEffect(() => {
+    if (clinicId) void registerForPush(clinicId);
+  }, [clinicId]);
 
   return (
     <ClinicCtx.Provider
@@ -142,7 +151,7 @@ export function ActiveClinicProvider({ children }: { children: ReactNode }) {
         loading,
         memberships,
         clinic: active?.clinic ?? null,
-        clinicId: active?.clinic.id ?? null,
+        clinicId,
         role: active?.role ?? null,
         userName,
         setActiveClinic,
