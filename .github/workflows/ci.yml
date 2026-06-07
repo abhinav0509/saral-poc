@@ -48,3 +48,25 @@ jobs:
       - name: Lint (non-blocking)
         run: pnpm lint
         continue-on-error: true
+
+  # Patient-web E2E (read-only smoke) against the deployed app. Non-blocking
+  # until it's proven stable; the write test stays gated behind TEST_CLINIC_CODE.
+  e2e:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        run: pnpm --filter @saral/patient-web exec playwright install --with-deps chromium
+      - name: Run patient-web E2E (read-only smoke)
+        run: pnpm --filter @saral/patient-web e2e
+        env:
+          PLAYWRIGHT_BASE_URL: https://saral-poc.vercel.app
+          CI: "true"

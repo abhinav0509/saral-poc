@@ -741,16 +741,36 @@ export interface CancelRemainingResult {
  * patient page can show warm, specific copy. Used when an emergency forces the
  * clinic to stop. Returns how many were cancelled.
  */
+/** Epoch ms of the next IST midnight (start of tomorrow, Asia/Kolkata = UTC+5:30). */
+function startOfTomorrowIstMs(): number {
+  const IST_OFFSET_MS = 5.5 * 3600 * 1000;
+  const ist = new Date(Date.now() + IST_OFFSET_MS); // UTC fields now read as IST wall clock
+  return Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate() + 1) - IST_OFFSET_MS;
+}
+
 export async function cancelRemainingToday(
   clinicId: string,
   reason = "clinic_emergency",
 ): Promise<CancelRemainingResult> {
-  const { data, error } = await getSupabase()
+  const sb = getSupabase();
+  // Only cancel today's queue — walk-ins (no booked_for) and bookings up to the
+  // end of the IST day. Future-dated bookings (next week) must NOT be dropped.
+  const { data: waiting, error: wErr } = await sb
+    .from("visits")
+    .select("id, booked_for")
+    .eq("clinic_id", clinicId)
+    .eq("status", "waiting");
+  if (wErr) throw wErr;
+  const rows = (waiting as { id: string; booked_for: string | null }[] | null) ?? [];
+  const tomorrowIst = startOfTomorrowIstMs();
+  const ids = rows
+    .filter((v) => v.booked_for == null || new Date(v.booked_for).getTime() < tomorrowIst)
+    .map((v) => v.id);
+  if (ids.length === 0) return { cancelled: 0 };
+  const { error } = await sb
     .from("visits")
     .update({ status: "dropped", ended_at: new Date().toISOString(), cancel_reason: reason })
-    .eq("clinic_id", clinicId)
-    .eq("status", "waiting")
-    .select("id");
+    .in("id", ids);
   if (error) throw error;
-  return { cancelled: (data as { id: string }[] | null)?.length ?? 0 };
+  return { cancelled: ids.length };
 }

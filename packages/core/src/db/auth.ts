@@ -7,12 +7,19 @@ import type { Session } from "@supabase/supabase-js";
  * bare 10-digit numbers are normalised to +91 E.164.
  */
 
-/** Normalise an Indian mobile to E.164 (+91XXXXXXXXXX). Accepts +91…, 91…, 0…, or 10 digits. */
+/**
+ * Normalise an Indian mobile to E.164 (+91XXXXXXXXXX). Accepts +91…, 91…, 0…,
+ * spaces/dashes, or a bare 10-digit number. Throws on anything that can't yield
+ * a valid 10-digit subscriber number, so we never send Supabase a junk "+91".
+ */
 export function toE164India(input: string): string {
-  const trimmed = input.trim();
-  if (trimmed.startsWith("+")) return "+" + trimmed.slice(1).replace(/\D/g, "");
-  const digits = trimmed.replace(/\D/g, "");
-  const last10 = digits.slice(-10);
+  const digits = (input ?? "").replace(/\D/g, "");
+  // Strip a leading country code (91) or trunk 0, then take the 10-digit number.
+  const local = digits.replace(/^0+/, "").replace(/^91(?=\d{10}$)/, "");
+  const last10 = local.slice(-10);
+  if (last10.length !== 10) {
+    throw new Error("Enter a valid 10-digit mobile number.");
+  }
   return "+91" + last10;
 }
 

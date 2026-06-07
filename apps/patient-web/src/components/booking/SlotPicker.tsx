@@ -97,6 +97,7 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
     blockReason: new Map(),
   }));
   const [loadingSlots, setLoadingSlots] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   // Re-tick every minute so past slots drop off
@@ -110,6 +111,7 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
   const loadAvailability = useCallback(async () => {
     try {
       setLoadingSlots(true);
+      setLoadError(false);
       if (mode === "public") {
         const raw = await getSlotAvailability(clinicCode ?? "", selectedDate);
         setBookedMap(
@@ -128,6 +130,7 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
       }
     } catch (e) {
       console.error("[slot-picker] load failed", e);
+      setLoadError(true);
     } finally {
       setLoadingSlots(false);
     }
@@ -344,8 +347,27 @@ export const SlotPicker = forwardRef<SlotPickerHandle, Props>(function SlotPicke
         </div>
       )}
 
+      {/* Load failure — don't masquerade an error as "no slots" */}
+      {loadError && !loadingSlots && (
+        <Card surface="raised" className="p-5 text-center flex flex-col gap-2 items-center">
+          <p className="text-label-md font-semibold text-text-primary">
+            Couldn&apos;t load available times
+          </p>
+          <p className="text-body-sm text-text-secondary leading-snug max-w-[260px]">
+            Check your connection and try again.
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadAvailability()}
+            className="mt-1 h-9 px-4 rounded-full text-label-sm font-semibold text-text-brand hover:bg-surface-sunken transition-colors"
+          >
+            Retry
+          </button>
+        </Card>
+      )}
+
       {/* Three period sections — sections fully past on today are hidden */}
-      {(() => {
+      {!loadError && (() => {
         const sections = [
           { key: "morning", heading: "Morning", icon: <Sun size={14} />, slots: MORNING_SLOTS },
           { key: "afternoon", heading: "Afternoon", icon: <Sunset size={14} />, slots: AFTERNOON_SLOTS },

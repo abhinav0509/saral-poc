@@ -12,7 +12,6 @@ import {
   Phone,
   Stethoscope,
   Plus,
-  X,
 } from "lucide-react-native";
 import {
   getTodayVisits,

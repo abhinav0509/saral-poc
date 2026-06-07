@@ -61,10 +61,19 @@ export function VisitClient({ initialView }: VisitClientProps) {
     prevEtaRef.current = etaMinutes;
   }, [etaMinutes, visit.status]);
 
+  // Guard against setState after unmount (poll/broadcast/cancel can resolve late).
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   async function refresh() {
     try {
       const fresh = await getVisitPublic(visit.public_token);
-      if (fresh) setView(fresh);
+      if (fresh && mountedRef.current) setView(fresh);
     } catch (e) {
       console.error("[visit] refresh failed", e);
     }

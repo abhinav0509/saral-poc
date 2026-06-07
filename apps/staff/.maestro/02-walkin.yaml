@@ -1,0 +1,18 @@
+appId: com.saral.staff
+name: Add a walk-in
+---
+- launchApp
+- assertVisible: "Quick actions"
+- tapOn: "Walk-in"
+- assertVisible: "Add walk-in"
+- tapOn: "e.g. Riya Sharma"   # Full name
+- inputText: "Maestro Walkin"
+- tapOn: "34"                 # Age
+- inputText: "29"
+- tapOn: "Female"
+- tapOn: "10-digit mobile"
+- inputText: "9000000123"
+- tapOn: "Add to queue"
+# Toast confirms; we land back and the queue shows the new patient.
+- tapOn: "Queue"
+- assertVisible: "Maestro Walkin"

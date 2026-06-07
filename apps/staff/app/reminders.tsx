@@ -12,7 +12,6 @@ import { useToast } from "@/components/ui/toast";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useActiveClinic } from "@/lib/auth";
 import { palette } from "@/lib/colors";
-import { haptics } from "@/lib/haptics";
 import { cn } from "@/lib/cn";
 
 type Tab = "due" | "upcoming" | "sent";

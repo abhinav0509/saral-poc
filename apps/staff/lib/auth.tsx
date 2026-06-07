@@ -62,8 +62,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await coreSignOut();
-    await AsyncStorage.removeItem(ACTIVE_CLINIC_KEY);
+    // Always clear the local active-clinic pref (shared-device hygiene), even
+    // if the network sign-out errors.
+    await Promise.allSettled([coreSignOut(), AsyncStorage.removeItem(ACTIVE_CLINIC_KEY)]);
   }, []);
 
   return <AuthCtx.Provider value={{ session, loading, signOut }}>{children}</AuthCtx.Provider>;
@@ -110,8 +111,9 @@ export function ActiveClinicProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       // Link any pending phone invites first, so a freshly-invited user's
-      // membership exists by the time we read it.
-      await acceptMyInvites().catch(() => {});
+      // membership exists by the time we read it. Non-blocking, but logged —
+      // a silent failure here strands a genuinely-invited user on onboarding.
+      await acceptMyInvites().catch((e) => console.warn("[auth] acceptMyInvites failed", e));
       const [mem, profile] = await Promise.all([getMyMemberships(), getMyProfile()]);
       setMemberships(mem);
       setUserName(profile?.full_name?.trim() || null);

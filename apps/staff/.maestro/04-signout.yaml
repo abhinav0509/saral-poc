@@ -1,0 +1,9 @@
+appId: com.saral.staff
+name: Sign out
+---
+- launchApp
+- assertVisible: "Quick actions"
+- tapOn: "More"
+- assertVisible: "Sign out"
+- tapOn: "Sign out"
+- assertVisible: "Welcome to Saral"

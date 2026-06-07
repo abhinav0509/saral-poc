@@ -1,0 +1,19 @@
+appId: com.saral.staff
+name: Add an emergency → top of queue
+---
+- launchApp
+- assertVisible: "Quick actions"
+- tapOn: "Emergency"
+- assertVisible: "Add emergency walk-in"
+- tapOn: "Add emergency walk-in"
+- assertVisible: "Emergency walk-in"
+- tapOn:
+    text: "Name.*"            # name field (emergency placeholder)
+- inputText: "Maestro Emergency"
+- tapOn: "Add as emergency"
+# Post-add sheet confirms it jumped to the top.
+- assertVisible: "is at the top"
+- tapOn: "Done"
+- tapOn: "Queue"
+- assertVisible: "Maestro Emergency"
+- assertVisible: "Emergency"   # the red badge on the row

@@ -1,0 +1,17 @@
+appId: com.saral.staff
+name: Dev login → Home
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Welcome to Saral"
+- tapOn:
+    id: "Email"
+    optional: true
+- tapOn: "dev@saral.test"        # email field (placeholder text)
+- inputText: "dev@saral.test"
+- tapOn: "At least 6 characters"  # password field (placeholder text)
+- inputText: "test1234"
+- tapOn: "Sign in"
+# Existing dev user already has a name + clinic → lands on Home.
+- assertVisible: "Quick actions"
+- assertVisible: "Emergency"
