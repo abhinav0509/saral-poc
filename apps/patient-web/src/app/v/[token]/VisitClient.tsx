@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Toast } from "@/components/ui/Toast";
 import { SaralArch } from "@/components/brand/SaralArch";
 import { BrowserChrome } from "@/components/patient/BrowserChrome";
-import { getVisitPublic, cancelVisitPublic } from "@/lib/db/queries";
+import { getVisitPublic, cancelVisitPublic, fetchRxSignedUrl } from "@/lib/db/queries";
 import { getSupabase } from "@/lib/db/client";
 import type {
   PublicVisitView,
@@ -444,6 +444,21 @@ function PostVisitView({
   clinic: PublicClinic;
   prescription: PublicPrescription | null;
 }) {
+  // The Rx image lives in a private bucket — `photo_url` is just a path. Trade
+  // the visit's public token for a short-lived signed URL to actually show it.
+  const hasPhoto = !!prescription?.photo_url;
+  const [rxUrl, setRxUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!hasPhoto) return;
+    let alive = true;
+    fetchRxSignedUrl(visit.public_token).then((u) => {
+      if (alive) setRxUrl(u);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [hasPhoto, visit.public_token]);
+
   return (
     <main className="min-h-dvh flex flex-col max-w-md mx-auto w-full bg-surface-canvas">
       <BrowserChrome url={`saral.live / v / ${visit.token}`} />
@@ -474,26 +489,27 @@ function PostVisitView({
         <p className="text-label-sm uppercase tracking-widest text-text-tertiary">
           Your prescription
         </p>
-        {prescription?.photo_url && (
+        {rxUrl && (
           <span className="text-caption text-text-tertiary">Tap to enlarge</span>
         )}
       </div>
 
-      {prescription?.photo_url ? (
-        <div className="px-5">
-          <a
-            href={prescription.photo_url}
-            target="_blank"
-            rel="noreferrer"
-            className="block"
-          >
-            <img
-              src={prescription.photo_url}
-              alt="Prescription"
-              className="w-full rounded-2xl border border-border-subtle bg-amber-50 shadow-sm"
-            />
-          </a>
-        </div>
+      {hasPhoto ? (
+        rxUrl ? (
+          <div className="px-5">
+            <a href={rxUrl} target="_blank" rel="noreferrer" className="block">
+              <img
+                src={rxUrl}
+                alt="Prescription"
+                className="w-full rounded-2xl border border-border-subtle bg-amber-50 shadow-sm"
+              />
+            </a>
+          </div>
+        ) : (
+          <div className="px-5">
+            <div className="w-full aspect-[3/4] rounded-2xl border border-border-subtle bg-amber-50/60 animate-pulse" />
+          </div>
+        )
       ) : (
         <div className="px-5">
           <Card surface="raised" className="p-6 text-center">
@@ -550,11 +566,8 @@ function PostVisitView({
             variant="secondary"
             leadingIcon={<Download size={18} />}
             className="!h-12"
-            disabled={!prescription?.photo_url}
-            onClick={() =>
-              prescription?.photo_url &&
-              window.open(prescription.photo_url, "_blank")
-            }
+            disabled={!rxUrl}
+            onClick={() => rxUrl && window.open(rxUrl, "_blank")}
           >
             Download
           </Button>

@@ -59,3 +59,9 @@ verify_jwt = false
 # whatsapp-webhook: called by Meta (no Supabase JWT) — verified via hub token.
 [functions.whatsapp-webhook]
 verify_jwt = false
+
+# rx-url: anonymous patients fetch a short-lived signed URL for their own Rx
+# (private bucket). verify_jwt OFF (new key format); access is gated by the
+# opaque public_token + a done-visit check inside the function.
+[functions.rx-url]
+verify_jwt = false

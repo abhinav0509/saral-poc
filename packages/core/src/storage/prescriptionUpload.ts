@@ -13,6 +13,13 @@ export interface UploadableFile {
 
 const BUCKET = "prescriptions";
 
+/**
+ * Upload a prescription photo and return its STORAGE PATH (e.g. "<visitId>/<ts>.jpg").
+ * The bucket is private (migration 0011) — there is no public URL. Patients view the
+ * image through a short-lived signed URL minted by the `rx-url` Edge Function; staff
+ * read it under the authenticated storage policy. The returned path is what gets
+ * stored in `prescriptions.photo_url`.
+ */
 export async function uploadPrescriptionPhoto(
   visitId: string,
   file: UploadableFile,
@@ -25,6 +32,5 @@ export async function uploadPrescriptionPhoto(
       contentType: file.contentType || "image/jpeg",
     });
   if (error) throw error;
-  const { data } = getSupabase().storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return path;
 }

@@ -21,6 +21,11 @@ export interface MiniQueueEntry {
 }
 
 export interface PublicPrescription {
+  /**
+   * Storage PATH of the Rx image (bucket is private — not a usable URL).
+   * Treat as a "has photo" signal; call `fetchRxSignedUrl(public_token)` to get
+   * a short-lived viewable URL.
+   */
   photo_url: string | null;
   typed_meds: TypedMed[];
   follow_up_note: string | null;
@@ -76,6 +81,24 @@ export async function getVisitPublic(publicToken: string): Promise<PublicVisitVi
   });
   if (error) throw error;
   return (data as PublicVisitView | null) ?? null;
+}
+
+/**
+ * Fetch a short-lived signed URL for a completed visit's prescription image.
+ * The bucket is private (0011); the `rx-url` Edge Function validates the token +
+ * done status server-side and signs the object. Returns null when there's no
+ * photo yet, the visit isn't done, or the fetch fails (caller just shows nothing).
+ */
+export async function fetchRxSignedUrl(publicToken: string): Promise<string | null> {
+  try {
+    const { data, error } = await getSupabase().functions.invoke("rx-url", {
+      body: { token: publicToken },
+    });
+    if (error) return null;
+    return (data as { url: string | null } | null)?.url ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getSlotAvailability(
